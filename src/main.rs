@@ -44,12 +44,26 @@ async fn main() {
             cidr,
             prefix,
             count,
+            max,
         } => {
             // Detect IPv4 vs IPv6 based on CIDR format
             let is_ipv6 = cidr.contains(':');
 
+            // Determine the actual count to use
+            let actual_count = if max {
+                None // Signal to generate maximum
+            } else {
+                match count {
+                    Some(c) => Some(c),
+                    None => {
+                        eprintln!("Error: Either --count or --max must be specified");
+                        std::process::exit(1);
+                    }
+                }
+            };
+
             if is_ipv6 {
-                match generate_ipv6_subnets(&cidr, prefix, count) {
+                match generate_ipv6_subnets(&cidr, prefix, actual_count) {
                     Ok(result) => {
                         let output = writer.write(&result).expect("Failed to write output");
                         if cli.output.is_none() {
@@ -62,7 +76,7 @@ async fn main() {
                     }
                 }
             } else {
-                match generate_ipv4_subnets(&cidr, prefix, count) {
+                match generate_ipv4_subnets(&cidr, prefix, actual_count) {
                     Ok(result) => {
                         let output = writer.write(&result).expect("Failed to write output");
                         if cli.output.is_none() {

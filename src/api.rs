@@ -22,7 +22,11 @@ pub struct SubnetQuery {
 pub struct SplitQuery {
     cidr: String,
     prefix: u8,
-    count: u64,
+    /// Number of subnets to generate. If not provided and max is true, generates all.
+    count: Option<u64>,
+    /// Generate maximum number of subnets possible.
+    #[serde(default)]
+    max: bool,
 }
 
 #[derive(Serialize)]
@@ -104,10 +108,32 @@ async fn calculate_ipv6(Query(params): Query<SubnetQuery>) -> impl IntoResponse 
     }
 }
 
-#[instrument(skip_all, fields(cidr = %params.cidr, prefix = params.prefix, count = params.count))]
+#[instrument(skip_all, fields(cidr = %params.cidr, prefix = params.prefix, count = ?params.count, max = params.max))]
 async fn split_ipv4(Query(params): Query<SplitQuery>) -> impl IntoResponse {
     info!("Splitting IPv4 supernet");
-    match generate_ipv4_subnets(&params.cidr, params.prefix, params.count) {
+
+    // Determine the actual count: None means generate max
+    let actual_count = if params.max {
+        None
+    } else {
+        match params.count {
+            Some(c) => Some(c),
+            None => {
+                warn!("Neither count nor max specified");
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(
+                        serde_json::to_value(ErrorResponse {
+                            error: "Either 'count' or 'max=true' must be specified".to_string(),
+                        })
+                        .unwrap(),
+                    ),
+                );
+            }
+        }
+    };
+
+    match generate_ipv4_subnets(&params.cidr, params.prefix, actual_count) {
         Ok(result) => {
             info!(
                 subnets_generated = result.subnets.len(),
@@ -130,10 +156,32 @@ async fn split_ipv4(Query(params): Query<SplitQuery>) -> impl IntoResponse {
     }
 }
 
-#[instrument(skip_all, fields(cidr = %params.cidr, prefix = params.prefix, count = params.count))]
+#[instrument(skip_all, fields(cidr = %params.cidr, prefix = params.prefix, count = ?params.count, max = params.max))]
 async fn split_ipv6(Query(params): Query<SplitQuery>) -> impl IntoResponse {
     info!("Splitting IPv6 supernet");
-    match generate_ipv6_subnets(&params.cidr, params.prefix, params.count) {
+
+    // Determine the actual count: None means generate max
+    let actual_count = if params.max {
+        None
+    } else {
+        match params.count {
+            Some(c) => Some(c),
+            None => {
+                warn!("Neither count nor max specified");
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(
+                        serde_json::to_value(ErrorResponse {
+                            error: "Either 'count' or 'max=true' must be specified".to_string(),
+                        })
+                        .unwrap(),
+                    ),
+                );
+            }
+        }
+    };
+
+    match generate_ipv6_subnets(&params.cidr, params.prefix, actual_count) {
         Ok(result) => {
             info!(
                 subnets_generated = result.subnets.len(),

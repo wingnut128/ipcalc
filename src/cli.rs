@@ -26,25 +26,29 @@ pub enum Commands {
         cidr: String,
     },
 
-    /// Calculate IPv6 subnet information
+    /// Calculate IPv6 subnet/prefix information
     #[command(name = "v6")]
     Ipv6 {
-        /// IPv6 address in CIDR notation (e.g., 2001:db8::/32)
+        /// IPv6 address with prefix (e.g., 2001:db8:abcd::/48)
         cidr: String,
     },
 
     /// Generate subnets from a supernet
     Split {
-        /// Network in CIDR notation
+        /// Network in CIDR notation (or prefix notation for IPv6)
         cidr: String,
 
         /// New prefix length for subnets
         #[arg(short = 'p', long)]
         prefix: u8,
 
-        /// Number of subnets to generate
-        #[arg(short = 'n', long)]
-        count: u64,
+        /// Number of subnets to generate (mutually exclusive with --max)
+        #[arg(short = 'n', long, conflicts_with = "max")]
+        count: Option<u64>,
+
+        /// Generate maximum number of subnets possible
+        #[arg(short = 'm', long, conflicts_with = "count")]
+        max: bool,
     },
 
     /// Start the HTTP API server

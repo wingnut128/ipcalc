@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `--max` (`-m`) option for split command to generate maximum number of subnets possible
+- API support for `max=true` query parameter on `/v4/split` and `/v6/split` endpoints
+
+### Changed
+
+- IPv6 help text now uses "prefix" terminology instead of "CIDR" for consistency with IPv6 conventions
+- IPv6 example in help changed from `/32` to `/48` (more typical enterprise allocation)
+- Split command now requires either `--count` or `--max` (mutually exclusive)
+
 ## [0.1.3] - 2025-01-16
 
 ### Added

@@ -109,3 +109,35 @@ fn test_split_too_many_subnets() {
     assert!(!success);
     assert!(stderr.contains("Error"));
 }
+
+#[test]
+fn test_split_ipv4_max() {
+    // Test --max option generates all possible subnets
+    let (stdout, _, success) = run_ipcalc(&["split", "192.168.0.0/22", "-p", "27", "--max"]);
+    assert!(success);
+
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("Invalid JSON");
+    // /22 to /27 is 5 bits difference, so 32 subnets
+    assert_eq!(json["requested_count"], 32);
+    assert_eq!(json["subnets"].as_array().unwrap().len(), 32);
+}
+
+#[test]
+fn test_split_ipv6_max() {
+    // Test --max option for IPv6
+    let (stdout, _, success) = run_ipcalc(&["split", "2001:db8:abcd::/48", "-p", "52", "--max"]);
+    assert!(success);
+
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("Invalid JSON");
+    // /48 to /52 is 4 bits difference, so 16 subnets
+    assert_eq!(json["requested_count"], 16);
+    assert_eq!(json["subnets"].as_array().unwrap().len(), 16);
+}
+
+#[test]
+fn test_split_requires_count_or_max() {
+    // Neither --count nor --max should fail
+    let (_, stderr, success) = run_ipcalc(&["split", "192.168.0.0/22", "-p", "27"]);
+    assert!(!success);
+    assert!(stderr.contains("Error"));
+}
