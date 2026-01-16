@@ -55,6 +55,18 @@ pub enum Commands {
         /// Port to listen on
         #[arg(short, long, default_value = "8080")]
         port: u16,
+
+        /// Log level (trace, debug, info, warn, error)
+        #[arg(long, default_value = "info")]
+        log_level: String,
+
+        /// Log to file instead of stdout
+        #[arg(long)]
+        log_file: Option<String>,
+
+        /// Output logs in JSON format
+        #[arg(long)]
+        log_json: bool,
     },
 }
 

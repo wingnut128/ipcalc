@@ -2,6 +2,11 @@
 name = "ipcalc"
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
+description = "A fast IPv4 and IPv6 subnet calculator CLI and API"
+repository = "https://github.com/wingnut128/ipcalc"
+keywords = ["ip", "subnet", "calculator", "ipv4", "ipv6"]
+categories = ["command-line-utilities", "network-programming"]
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
@@ -10,6 +15,15 @@ serde_json = "1"
 tokio = { version = "1", features = ["full"] }
 axum = "0.7"
 thiserror = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tracing-appender = "0.2"
+tower-http = { version = "0.5", features = ["trace"] }
 
 [dev-dependencies]
 tokio-test = "0.4"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
