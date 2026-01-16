@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-01-16
+
+### Added
+
+- OpenAPI 3.0 documentation for all API endpoints via optional `swagger` feature (enabled by default)
+- New `/api-docs/openapi.json` endpoint to retrieve OpenAPI specification
+- Comprehensive schema documentation for all request/response types
+- Support for importing API spec into Swagger Editor, Postman, Insomnia, and other tools
+
+### Changed
+
+- API documentation is now machine-readable and can be consumed by API tooling
+- Binary can be built without swagger support using `--no-default-features` for smaller size
+
 ## [0.1.8] - 2026-01-16
 
 ### Changed
@@ -107,7 +121,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dockerfile for containerized deployment
 - Makefile for common development tasks
 
-[Unreleased]: https://github.com/wingnut128/ipcalc/compare/v0.1.8...HEAD
+[Unreleased]: https://github.com/wingnut128/ipcalc/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/wingnut128/ipcalc/compare/v0.1.8...v0.2.0
 [0.1.8]: https://github.com/wingnut128/ipcalc/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/wingnut128/ipcalc/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/wingnut128/ipcalc/compare/v0.1.5...v0.1.6
