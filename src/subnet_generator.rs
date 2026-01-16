@@ -5,6 +5,7 @@ use serde::Serialize;
 use std::net::{Ipv4Addr, Ipv6Addr};
 
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "swagger", derive(utoipa::ToSchema))]
 pub struct Ipv4SubnetList {
     pub supernet: Ipv4Subnet,
     pub new_prefix: u8,
@@ -13,6 +14,7 @@ pub struct Ipv4SubnetList {
 }
 
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "swagger", derive(utoipa::ToSchema))]
 pub struct Ipv6SubnetList {
     pub supernet: Ipv6Subnet,
     pub new_prefix: u8,

@@ -1,8 +1,10 @@
 /target
 .idea/
+.claude/
 *.swp
 *.swo
 *~
 .DS_Store
 *.log
 SPEC_TEMPLATE.md
+/.claude/

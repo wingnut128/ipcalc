@@ -4,6 +4,7 @@ use std::net::Ipv6Addr;
 use std::str::FromStr;
 
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "swagger", derive(utoipa::ToSchema))]
 pub struct Ipv6Subnet {
     pub input: String,
     pub network_address: String,
