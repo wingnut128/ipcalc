@@ -6,8 +6,21 @@ use ipcalc::ipv6::Ipv6Subnet;
 use ipcalc::logging::{LogConfig, init_logging, parse_log_level};
 use ipcalc::output::{OutputFormat, OutputWriter};
 use ipcalc::subnet_generator::{generate_ipv4_subnets, generate_ipv6_subnets};
+use std::io::{self, Write};
 use std::net::SocketAddr;
 use tracing::info;
+
+/// Print to stdout, handling broken pipe errors gracefully.
+/// When output is piped to commands like `head`, the pipe may close early.
+fn print_stdout(s: &str) {
+    if let Err(e) = writeln!(io::stdout(), "{}", s) {
+        if e.kind() == io::ErrorKind::BrokenPipe {
+            std::process::exit(0);
+        }
+        eprintln!("Error writing to stdout: {}", e);
+        std::process::exit(1);
+    }
+}
 
 #[tokio::main]
 async fn main() {
@@ -20,7 +33,7 @@ async fn main() {
             Ok(subnet) => {
                 let output = writer.write(&subnet).expect("Failed to write output");
                 if cli.output.is_none() {
-                    println!("{}", output);
+                    print_stdout(&output);
                 }
             }
             Err(e) => {
@@ -32,7 +45,7 @@ async fn main() {
             Ok(subnet) => {
                 let output = writer.write(&subnet).expect("Failed to write output");
                 if cli.output.is_none() {
-                    println!("{}", output);
+                    print_stdout(&output);
                 }
             }
             Err(e) => {
@@ -67,7 +80,7 @@ async fn main() {
                     Ok(result) => {
                         let output = writer.write(&result).expect("Failed to write output");
                         if cli.output.is_none() {
-                            println!("{}", output);
+                            print_stdout(&output);
                         }
                     }
                     Err(e) => {
@@ -80,7 +93,7 @@ async fn main() {
                     Ok(result) => {
                         let output = writer.write(&result).expect("Failed to write output");
                         if cli.output.is_none() {
-                            println!("{}", output);
+                            print_stdout(&output);
                         }
                     }
                     Err(e) => {
