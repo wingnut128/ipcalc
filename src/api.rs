@@ -10,6 +10,8 @@ use tower_http::trace::TraceLayer;
 use tracing::{info, instrument, warn};
 #[cfg(feature = "swagger")]
 use utoipa::{IntoParams, OpenApi, ToSchema};
+#[cfg(feature = "swagger")]
+use utoipa_swagger_ui::SwaggerUi;
 
 use crate::ipv4::Ipv4Subnet;
 use crate::ipv6::Ipv6Subnet;
@@ -89,14 +91,10 @@ pub fn create_router() -> Router {
         .route("/v6/split", get(split_ipv6));
 
     #[cfg(feature = "swagger")]
-    let router = router.route("/api-docs/openapi.json", get(openapi_spec));
+    let router = router
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()));
 
     router.layer(TraceLayer::new_for_http())
-}
-
-#[cfg(feature = "swagger")]
-async fn openapi_spec() -> Json<utoipa::openapi::OpenApi> {
-    Json(ApiDoc::openapi())
 }
 
 #[cfg_attr(feature = "swagger", utoipa::path(

@@ -185,6 +185,7 @@ async fn main() {
             println!("  GET /v6?cidr=<cidr>      - Calculate IPv6 subnet");
             println!("  GET /v4/split?cidr=<cidr>&prefix=<n>&count=<n> - Split IPv4 supernet");
             println!("  GET /v6/split?cidr=<cidr>&prefix=<n>&count=<n> - Split IPv6 supernet");
+            println!("  GET /api-docs - Swagger API documentation");
 
             let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
             axum::serve(listener, create_router()).await.unwrap();
