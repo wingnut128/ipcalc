@@ -35,17 +35,23 @@ cargo install --path .
 
 ## Usage
 
-### IPv4 Subnet Calculation
+### Subnet Calculation
+
+The CLI auto-detects IPv4 or IPv6 based on the CIDR notation:
 
 ```bash
 # JSON output (default)
-ipcalc v4 192.168.1.0/24
+ipcalc 192.168.1.0/24
 
 # Plain text output
-ipcalc v4 192.168.1.0/24 --format text
+ipcalc 192.168.1.0/24 --format text
 
 # Output to file
-ipcalc v4 10.0.0.0/8 -o results.json
+ipcalc 10.0.0.0/8 -o results.json
+
+# IPv6 prefix
+ipcalc 2001:db8::/32
+ipcalc fe80::1/64 --format text
 ```
 
 Example JSON output:
@@ -64,13 +70,6 @@ Example JSON output:
   "network_class": "C",
   "is_private": true
 }
-```
-
-### IPv6 Prefix Calculation
-
-```bash
-ipcalc v6 2001:db8::/32
-ipcalc v6 fe80::1/64 --format text
 ```
 
 ### Subnet Splitting
@@ -125,11 +124,12 @@ curl "http://localhost:8080/v4/split?cidr=192.168.0.0/22&prefix=27&count=10"
 ## CLI Reference
 
 ```
-ipcalc [OPTIONS] <COMMAND>
+ipcalc [OPTIONS] [CIDR] [COMMAND]
+
+Arguments:
+  [CIDR]  IP address in CIDR notation (e.g., 192.168.1.0/24 or 2001:db8::/48)
 
 Commands:
-  v4     Calculate IPv4 subnet information
-  v6     Calculate IPv6 subnet information
   split  Generate subnets from a supernet
   serve  Start the HTTP API server
   help   Print help for a command
@@ -141,6 +141,8 @@ Options:
   -V, --version          Print version
 ```
 
+**Note:** The legacy `v4` and `v6` subcommands are still supported for backwards compatibility but are deprecated.
+
 ## Docker
 
 ```bash
@@ -148,7 +150,7 @@ Options:
 docker build -t ipcalc .
 
 # Run CLI
-docker run --rm ipcalc v4 192.168.1.0/24
+docker run --rm ipcalc 192.168.1.0/24
 
 # Run API server
 docker run --rm -p 8080:8080 ipcalc serve --address 0.0.0.0
