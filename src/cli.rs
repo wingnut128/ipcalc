@@ -2,6 +2,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 
 #[derive(Parser)]
 #[command(name = "ipcalc")]
+#[command(version)]
 #[command(about = "IP subnet calculator for IPv4 and IPv6", long_about = None)]
 pub struct Cli {
     #[command(subcommand)]

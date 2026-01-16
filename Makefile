@@ -1,4 +1,4 @@
-.PHONY: all build release test lint fmt clean docker docker-run help
+.PHONY: all build release test lint fmt clean docker docker-run help setup
 
 # Variables
 BINARY_NAME := ipcalc
@@ -72,6 +72,11 @@ check: fmt-check lint test
 ci: check
 	cargo build --release
 
+# Setup development environment (install git hooks)
+setup:
+	git config core.hooksPath .githooks
+	@echo "Git hooks installed. Pre-commit will run fmt and clippy."
+
 # Print version
 version:
 	@echo $(VERSION)
@@ -99,5 +104,6 @@ help:
 	@echo "  serve-debug   Run API server with debug logging"
 	@echo "  check         Run fmt-check, lint, and test"
 	@echo "  ci            Full CI pipeline"
+	@echo "  setup         Setup git hooks for development"
 	@echo "  version       Print version"
 	@echo "  help          Show this help"

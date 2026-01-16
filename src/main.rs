@@ -3,7 +3,7 @@ use ipcalc::api::create_router;
 use ipcalc::cli::{Cli, Commands};
 use ipcalc::ipv4::Ipv4Subnet;
 use ipcalc::ipv6::Ipv6Subnet;
-use ipcalc::logging::{init_logging, parse_log_level, LogConfig};
+use ipcalc::logging::{LogConfig, init_logging, parse_log_level};
 use ipcalc::output::{OutputFormat, OutputWriter};
 use ipcalc::subnet_generator::{generate_ipv4_subnets, generate_ipv6_subnets};
 use std::net::SocketAddr;
@@ -16,35 +16,35 @@ async fn main() {
     let writer = OutputWriter::new(format, cli.output.clone());
 
     match cli.command {
-        Commands::Ipv4 { cidr } => {
-            match Ipv4Subnet::from_cidr(&cidr) {
-                Ok(subnet) => {
-                    let output = writer.write(&subnet).expect("Failed to write output");
-                    if cli.output.is_none() {
-                        println!("{}", output);
-                    }
-                }
-                Err(e) => {
-                    eprintln!("Error: {}", e);
-                    std::process::exit(1);
+        Commands::Ipv4 { cidr } => match Ipv4Subnet::from_cidr(&cidr) {
+            Ok(subnet) => {
+                let output = writer.write(&subnet).expect("Failed to write output");
+                if cli.output.is_none() {
+                    println!("{}", output);
                 }
             }
-        }
-        Commands::Ipv6 { cidr } => {
-            match Ipv6Subnet::from_cidr(&cidr) {
-                Ok(subnet) => {
-                    let output = writer.write(&subnet).expect("Failed to write output");
-                    if cli.output.is_none() {
-                        println!("{}", output);
-                    }
-                }
-                Err(e) => {
-                    eprintln!("Error: {}", e);
-                    std::process::exit(1);
+            Err(e) => {
+                eprintln!("Error: {}", e);
+                std::process::exit(1);
+            }
+        },
+        Commands::Ipv6 { cidr } => match Ipv6Subnet::from_cidr(&cidr) {
+            Ok(subnet) => {
+                let output = writer.write(&subnet).expect("Failed to write output");
+                if cli.output.is_none() {
+                    println!("{}", output);
                 }
             }
-        }
-        Commands::Split { cidr, prefix, count } => {
+            Err(e) => {
+                eprintln!("Error: {}", e);
+                std::process::exit(1);
+            }
+        },
+        Commands::Split {
+            cidr,
+            prefix,
+            count,
+        } => {
             // Detect IPv4 vs IPv6 based on CIDR format
             let is_ipv6 = cidr.contains(':');
 
@@ -93,8 +93,7 @@ async fn main() {
             };
 
             // Initialize logging
-            let log_config = LogConfig::new(level)
-                .with_json(log_json);
+            let log_config = LogConfig::new(level).with_json(log_json);
             let log_config = match log_file {
                 Some(path) => log_config.with_file(path),
                 None => log_config,
@@ -114,6 +113,7 @@ async fn main() {
             println!("Starting ipcalc API server on http://{}", addr);
             println!("Endpoints:");
             println!("  GET /health              - Health check");
+            println!("  GET /version             - Version information");
             println!("  GET /v4?cidr=<cidr>      - Calculate IPv4 subnet");
             println!("  GET /v6?cidr=<cidr>      - Calculate IPv6 subnet");
             println!("  GET /v4/split?cidr=<cidr>&prefix=<n>&count=<n> - Split IPv4 supernet");

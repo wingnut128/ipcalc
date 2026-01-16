@@ -10,5 +10,5 @@ pub mod subnet_generator;
 pub use error::IpCalcError;
 pub use ipv4::Ipv4Subnet;
 pub use ipv6::Ipv6Subnet;
-pub use logging::{init_logging, LogConfig};
+pub use logging::{LogConfig, init_logging};
 pub use output::{OutputFormat, OutputWriter};

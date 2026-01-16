@@ -134,7 +134,10 @@ mod tests {
     fn test_ipv6_subnet_64() {
         let subnet = Ipv6Subnet::from_cidr("2001:db8:85a3::8a2e:370:7334/64").unwrap();
         assert_eq!(subnet.network_address, "2001:db8:85a3::");
-        assert_eq!(subnet.network_address_full, "2001:0db8:85a3:0000:0000:0000:0000:0000");
+        assert_eq!(
+            subnet.network_address_full,
+            "2001:0db8:85a3:0000:0000:0000:0000:0000"
+        );
         assert_eq!(subnet.prefix_length, 64);
         assert_eq!(subnet.address_type, "Global Unicast");
     }

@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3] - 2025-01-16
+
+### Added
+
+- CI and license status badges to README
+
+### Fixed
+
+- Code formatting to comply with rustfmt standards
+
+## [0.1.2] - 2025-01-16
+
+### Added
+
+- Pre-commit git hook for automated linting and format checks
+- `make setup` command to install git hooks for development
+
+## [0.1.1] - 2025-01-16
+
+### Added
+
+- CI workflow with automated testing, linting, and format checks
+- CodeQL security scanning (on push, PR, and weekly schedule)
+- cargo-audit for dependency vulnerability scanning
+
 ## [0.1.0] - 2025-01-16
 
 ### Added
@@ -30,5 +55,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dockerfile for containerized deployment
 - Makefile for common development tasks
 
-[Unreleased]: https://github.com/wingnut128/ipcalc/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/wingnut128/ipcalc/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/wingnut128/ipcalc/compare/v0.1.2...v0.1.3
+[0.1.2]: https://github.com/wingnut128/ipcalc/compare/v0.1.1...v0.1.2
+[0.1.1]: https://github.com/wingnut128/ipcalc/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/wingnut128/ipcalc/releases/tag/v0.1.0

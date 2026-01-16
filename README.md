@@ -1,5 +1,9 @@
 # ipcalc
 
+[![CI](https://github.com/wingnut128/ipcalc/actions/workflows/ci.yml/badge.svg)](https://github.com/wingnut128/ipcalc/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/wingnut128/ipcalc/actions/workflows/codeql.yml/badge.svg)](https://github.com/wingnut128/ipcalc/actions/workflows/codeql.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A fast IPv4 and IPv6 subnet calculator written in Rust. Available as both a CLI tool and HTTP API.
 
 ## Features
@@ -99,6 +103,7 @@ ipcalc serve --log-level debug --log-file /var/log/ipcalc.log
 | Endpoint | Description | Example |
 |----------|-------------|---------|
 | `GET /health` | Health check | `/health` |
+| `GET /version` | Version information | `/version` |
 | `GET /v4?cidr=<cidr>` | IPv4 calculation | `/v4?cidr=192.168.1.0/24` |
 | `GET /v6?cidr=<cidr>` | IPv6 calculation | `/v6?cidr=2001:db8::/32` |
 | `GET /v4/split?cidr=<cidr>&prefix=<n>&count=<n>` | Split IPv4 supernet | `/v4/split?cidr=10.0.0.0/8&prefix=16&count=5` |
@@ -133,6 +138,7 @@ Options:
   -f, --format <FORMAT>  Output format [default: json] [possible values: json, text]
   -o, --output <OUTPUT>  Output file path (prints to stdout if not specified)
   -h, --help             Print help
+  -V, --version          Print version
 ```
 
 ## Docker
@@ -151,6 +157,9 @@ docker run --rm -p 8080:8080 ipcalc serve --address 0.0.0.0
 ## Development
 
 ```bash
+# Setup git hooks (required for development)
+make setup
+
 # Build
 make build
 
@@ -166,6 +175,8 @@ make release
 # Build Docker image
 make docker
 ```
+
+The `make setup` command installs a pre-commit hook that automatically runs `cargo fmt --check` and `cargo clippy` before each commit.
 
 ## License
 

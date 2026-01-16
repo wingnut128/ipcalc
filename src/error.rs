@@ -14,7 +14,9 @@ pub enum IpCalcError {
     #[error("Invalid prefix length: {0} (must be 0-32 for IPv4, 0-128 for IPv6)")]
     InvalidPrefixLength(u8),
 
-    #[error("Cannot generate {requested} /{new_prefix} subnets from /{original_prefix} (only {available} available)")]
+    #[error(
+        "Cannot generate {requested} /{new_prefix} subnets from /{original_prefix} (only {available} available)"
+    )]
     InsufficientSubnets {
         requested: u64,
         available: u64,
@@ -22,11 +24,10 @@ pub enum IpCalcError {
         original_prefix: u8,
     },
 
-    #[error("New prefix length {new_prefix} must be greater than original prefix {original_prefix}")]
-    InvalidSubnetSplit {
-        new_prefix: u8,
-        original_prefix: u8,
-    },
+    #[error(
+        "New prefix length {new_prefix} must be greater than original prefix {original_prefix}"
+    )]
+    InvalidSubnetSplit { new_prefix: u8, original_prefix: u8 },
 
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),

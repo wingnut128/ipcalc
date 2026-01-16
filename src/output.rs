@@ -72,7 +72,12 @@ impl TextOutput for Ipv4Subnet {
         writeln!(out, "Total Hosts:       {}", self.total_hosts).unwrap();
         writeln!(out, "Usable Hosts:      {}", self.usable_hosts).unwrap();
         writeln!(out, "Network Class:     {}", self.network_class).unwrap();
-        writeln!(out, "Private Address:   {}", if self.is_private { "Yes" } else { "No" }).unwrap();
+        writeln!(
+            out,
+            "Private Address:   {}",
+            if self.is_private { "Yes" } else { "No" }
+        )
+        .unwrap();
         out
     }
 }

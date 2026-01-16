@@ -42,7 +42,11 @@ impl Ipv4Subnet {
         }
 
         let addr_u32 = u32::from(addr);
-        let mask = if prefix == 0 { 0 } else { !0u32 << (32 - prefix) };
+        let mask = if prefix == 0 {
+            0
+        } else {
+            !0u32 << (32 - prefix)
+        };
         let wildcard = !mask;
 
         let network = addr_u32 & mask;
@@ -53,8 +57,16 @@ impl Ipv4Subnet {
         let subnet_mask = Ipv4Addr::from(mask);
         let wildcard_mask = Ipv4Addr::from(wildcard);
 
-        let total_hosts = if prefix == 32 { 1 } else { 2u64.pow((32 - prefix) as u32) };
-        let usable_hosts = if prefix >= 31 { total_hosts } else { total_hosts.saturating_sub(2) };
+        let total_hosts = if prefix == 32 {
+            1
+        } else {
+            2u64.pow((32 - prefix) as u32)
+        };
+        let usable_hosts = if prefix >= 31 {
+            total_hosts
+        } else {
+            total_hosts.saturating_sub(2)
+        };
 
         let (first_host, last_host) = if prefix >= 31 {
             (network_addr, broadcast_addr)
