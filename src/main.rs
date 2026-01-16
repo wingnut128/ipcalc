@@ -1,4 +1,4 @@
-use clap::Parser;
+use clap::{CommandFactory, Parser};
 use ipcalc::api::create_router;
 use ipcalc::cli::{Cli, Commands};
 use ipcalc::ipv4::Ipv4Subnet;
@@ -190,10 +190,10 @@ async fn main() {
             axum::serve(listener, create_router()).await.unwrap();
         }
         None => {
-            eprintln!("Error: No CIDR or command provided");
-            eprintln!("Usage: ipcalc <CIDR> or ipcalc <COMMAND>");
-            eprintln!("Try 'ipcalc --help' for more information");
-            std::process::exit(1);
+            // Show help when no arguments are provided
+            Cli::command().print_help().expect("Failed to print help");
+            println!(); // Add a newline for better formatting
+            std::process::exit(0);
         }
     }
 }
