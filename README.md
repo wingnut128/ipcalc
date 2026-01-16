@@ -14,6 +14,7 @@ A fast IPv4 and IPv6 subnet calculator written in Rust. Available as both a CLI 
 - **Multiple output formats**: JSON (default) or plain text
 - **File output**: write results directly to a file
 - **HTTP API**: REST endpoints for all calculations
+- **OpenAPI documentation**: Machine-readable API specification for easy integration with tools like Swagger Editor, Postman, and Insomnia
 
 ## Installation
 
@@ -107,6 +108,7 @@ ipcalc serve --log-level debug --log-file /var/log/ipcalc.log
 | `GET /v6?cidr=<cidr>` | IPv6 calculation | `/v6?cidr=2001:db8::/32` |
 | `GET /v4/split?cidr=<cidr>&prefix=<n>&count=<n>` | Split IPv4 supernet | `/v4/split?cidr=10.0.0.0/8&prefix=16&count=5` |
 | `GET /v6/split?cidr=<cidr>&prefix=<n>&count=<n>` | Split IPv6 supernet | `/v6/split?cidr=2001:db8::/32&prefix=48&count=10` |
+| `GET /api-docs/openapi.json` | OpenAPI 3.0 specification | `/api-docs/openapi.json` |
 
 #### Example API Requests
 
@@ -119,6 +121,35 @@ curl "http://localhost:8080/v6?cidr=2001:db8::/32"
 
 # Split a /22 into /27 subnets
 curl "http://localhost:8080/v4/split?cidr=192.168.0.0/22&prefix=27&count=10"
+
+# Get OpenAPI specification
+curl "http://localhost:8080/api-docs/openapi.json"
+```
+
+#### OpenAPI Documentation
+
+The API provides a complete OpenAPI 3.0 specification that can be used with various API tools:
+
+```bash
+# Get the OpenAPI spec
+curl http://localhost:8080/api-docs/openapi.json > openapi.json
+
+# Import into Swagger Editor
+# Visit https://editor.swagger.io and import the openapi.json file
+
+# Use with Postman
+# Import the openapi.json file into Postman to generate a collection
+
+# Use with other tools
+# The spec is compatible with Insomnia, API clients, and code generators
+```
+
+**Building without OpenAPI support:**
+
+The OpenAPI documentation feature is optional and enabled by default. To build a smaller binary without it:
+
+```bash
+cargo build --release --no-default-features
 ```
 
 ## CLI Reference
