@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-01-16
+
+### Changed
+
+- CLI now displays help message when run without arguments instead of showing an error
+- Improved user experience with exit code 0 (success) when showing help
+
 ## [0.1.7] - 2026-01-16
 
 ### Added
@@ -100,7 +107,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dockerfile for containerized deployment
 - Makefile for common development tasks
 
-[Unreleased]: https://github.com/wingnut128/ipcalc/compare/v0.1.7...HEAD
+[Unreleased]: https://github.com/wingnut128/ipcalc/compare/v0.1.8...HEAD
+[0.1.8]: https://github.com/wingnut128/ipcalc/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/wingnut128/ipcalc/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/wingnut128/ipcalc/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/wingnut128/ipcalc/compare/v0.1.4...v0.1.5
