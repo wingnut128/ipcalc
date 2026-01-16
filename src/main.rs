@@ -28,37 +28,77 @@ async fn main() {
     let format: OutputFormat = cli.format.into();
     let writer = OutputWriter::new(format, cli.output.clone());
 
+    // Handle direct CIDR input (auto-detect)
+    if let Some(cidr) = cli.cidr {
+        let is_ipv6 = cidr.contains(':');
+        if is_ipv6 {
+            match Ipv6Subnet::from_cidr(&cidr) {
+                Ok(subnet) => {
+                    let output = writer.write(&subnet).expect("Failed to write output");
+                    if cli.output.is_none() {
+                        print_stdout(&output);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        } else {
+            match Ipv4Subnet::from_cidr(&cidr) {
+                Ok(subnet) => {
+                    let output = writer.write(&subnet).expect("Failed to write output");
+                    if cli.output.is_none() {
+                        print_stdout(&output);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        return;
+    }
+
+    // Handle subcommands
     match cli.command {
-        Commands::Ipv4 { cidr } => match Ipv4Subnet::from_cidr(&cidr) {
-            Ok(subnet) => {
-                let output = writer.write(&subnet).expect("Failed to write output");
-                if cli.output.is_none() {
-                    print_stdout(&output);
+        Some(Commands::Ipv4 { cidr }) => {
+            eprintln!("Warning: 'v4' is deprecated, use 'ipcalc <cidr>' instead");
+            match Ipv4Subnet::from_cidr(&cidr) {
+                Ok(subnet) => {
+                    let output = writer.write(&subnet).expect("Failed to write output");
+                    if cli.output.is_none() {
+                        print_stdout(&output);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                    std::process::exit(1);
                 }
             }
-            Err(e) => {
-                eprintln!("Error: {}", e);
-                std::process::exit(1);
-            }
-        },
-        Commands::Ipv6 { cidr } => match Ipv6Subnet::from_cidr(&cidr) {
-            Ok(subnet) => {
-                let output = writer.write(&subnet).expect("Failed to write output");
-                if cli.output.is_none() {
-                    print_stdout(&output);
+        }
+        Some(Commands::Ipv6 { cidr }) => {
+            eprintln!("Warning: 'v6' is deprecated, use 'ipcalc <cidr>' instead");
+            match Ipv6Subnet::from_cidr(&cidr) {
+                Ok(subnet) => {
+                    let output = writer.write(&subnet).expect("Failed to write output");
+                    if cli.output.is_none() {
+                        print_stdout(&output);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                    std::process::exit(1);
                 }
             }
-            Err(e) => {
-                eprintln!("Error: {}", e);
-                std::process::exit(1);
-            }
-        },
-        Commands::Split {
+        }
+        Some(Commands::Split {
             cidr,
             prefix,
             count,
             max,
-        } => {
+        }) => {
             // Detect IPv4 vs IPv6 based on CIDR format
             let is_ipv6 = cidr.contains(':');
 
@@ -103,13 +143,13 @@ async fn main() {
                 }
             }
         }
-        Commands::Serve {
+        Some(Commands::Serve {
             address,
             port,
             log_level,
             log_file,
             log_json,
-        } => {
+        }) => {
             // Parse and validate log level
             let level = match parse_log_level(&log_level) {
                 Ok(l) => l,
@@ -148,6 +188,12 @@ async fn main() {
 
             let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
             axum::serve(listener, create_router()).await.unwrap();
+        }
+        None => {
+            eprintln!("Error: No CIDR or command provided");
+            eprintln!("Usage: ipcalc <CIDR> or ipcalc <COMMAND>");
+            eprintln!("Try 'ipcalc --help' for more information");
+            std::process::exit(1);
         }
     }
 }

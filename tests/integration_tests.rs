@@ -141,3 +141,53 @@ fn test_split_requires_count_or_max() {
     assert!(!success);
     assert!(stderr.contains("Error"));
 }
+
+#[test]
+fn test_direct_ipv4() {
+    let (stdout, _, success) = run_ipcalc(&["192.168.1.0/24"]);
+    assert!(success);
+
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("Invalid JSON");
+    assert_eq!(json["network_address"], "192.168.1.0");
+    assert_eq!(json["broadcast_address"], "192.168.1.255");
+    assert_eq!(json["prefix_length"], 24);
+}
+
+#[test]
+fn test_direct_ipv6() {
+    let (stdout, _, success) = run_ipcalc(&["2001:db8::/32"]);
+    assert!(success);
+
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("Invalid JSON");
+    assert_eq!(json["network_address"], "2001:db8::");
+    assert_eq!(json["prefix_length"], 32);
+    assert_eq!(json["address_type"], "Global Unicast");
+}
+
+#[test]
+fn test_direct_ipv4_text_format() {
+    let (stdout, _, success) = run_ipcalc(&["10.0.0.0/8", "--format", "text"]);
+    assert!(success);
+    assert!(stdout.contains("IPv4 Subnet Calculator"));
+    assert!(stdout.contains("Network Address:   10.0.0.0"));
+}
+
+#[test]
+fn test_v4_deprecation_warning() {
+    let (stdout, stderr, success) = run_ipcalc(&["v4", "192.168.1.0/24"]);
+    assert!(success);
+    assert!(stderr.contains("deprecated"));
+    // Verify it still works
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("Invalid JSON");
+    assert_eq!(json["network_address"], "192.168.1.0");
+}
+
+#[test]
+fn test_v6_deprecation_warning() {
+    let (stdout, stderr, success) = run_ipcalc(&["v6", "2001:db8::/32"]);
+    assert!(success);
+    assert!(stderr.contains("deprecated"));
+    // Verify it still works
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("Invalid JSON");
+    assert_eq!(json["network_address"], "2001:db8::");
+}

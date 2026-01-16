@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-01-16
+
+### Added
+
+- Direct CIDR notation support: use `ipcalc <cidr>` instead of subcommands
+- Auto-detection of IPv4 vs IPv6 based on input format
+- Integration tests for direct CIDR input and deprecation warnings
+
+### Changed
+
+- Simplified CLI interface - CIDR can now be passed directly as a positional argument
+- Users should now use `ipcalc 192.168.1.0/24` instead of `ipcalc v4 192.168.1.0/24`
+
+### Deprecated
+
+- `v4` subcommand - use `ipcalc <cidr>` instead
+- `v6` subcommand - use `ipcalc <cidr>` instead
+
 ## [0.1.6] - 2026-01-16
 
 ### Fixed
@@ -82,7 +100,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dockerfile for containerized deployment
 - Makefile for common development tasks
 
-[Unreleased]: https://github.com/wingnut128/ipcalc/compare/v0.1.6...HEAD
+[Unreleased]: https://github.com/wingnut128/ipcalc/compare/v0.1.7...HEAD
+[0.1.7]: https://github.com/wingnut128/ipcalc/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/wingnut128/ipcalc/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/wingnut128/ipcalc/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/wingnut128/ipcalc/compare/v0.1.3...v0.1.4

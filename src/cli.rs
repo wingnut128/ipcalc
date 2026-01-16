@@ -5,8 +5,12 @@ use clap::{Parser, Subcommand, ValueEnum};
 #[command(version)]
 #[command(about = "IP subnet calculator for IPv4 and IPv6", long_about = None)]
 pub struct Cli {
+    /// IP address in CIDR notation (e.g., 192.168.1.0/24 or 2001:db8::/48)
+    #[arg(value_name = "CIDR")]
+    pub cidr: Option<String>,
+
     #[command(subcommand)]
-    pub command: Commands,
+    pub command: Option<Commands>,
 
     /// Output format (json or text)
     #[arg(short, long, default_value = "json", global = true)]
@@ -19,15 +23,15 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
-    /// Calculate IPv4 subnet information
-    #[command(name = "v4")]
+    /// Calculate IPv4 subnet information [DEPRECATED: use 'ipcalc <cidr>' instead]
+    #[command(name = "v4", hide = true)]
     Ipv4 {
         /// IPv4 address in CIDR notation (e.g., 192.168.1.0/24)
         cidr: String,
     },
 
-    /// Calculate IPv6 subnet/prefix information
-    #[command(name = "v6")]
+    /// Calculate IPv6 subnet/prefix information [DEPRECATED: use 'ipcalc <cidr>' instead]
+    #[command(name = "v6", hide = true)]
     Ipv6 {
         /// IPv6 address with prefix (e.g., 2001:db8:abcd::/48)
         cidr: String,
