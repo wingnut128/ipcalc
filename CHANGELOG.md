@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-01-16
+
+### Fixed
+
+- Swagger endpoints now only appear in help text when swagger feature is enabled
+
 ## [0.2.0] - 2026-01-16
 
 ### Added
@@ -121,7 +127,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dockerfile for containerized deployment
 - Makefile for common development tasks
 
-[Unreleased]: https://github.com/wingnut128/ipcalc/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/wingnut128/ipcalc/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/wingnut128/ipcalc/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/wingnut128/ipcalc/compare/v0.1.8...v0.2.0
 [0.1.8]: https://github.com/wingnut128/ipcalc/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/wingnut128/ipcalc/compare/v0.1.6...v0.1.7
