@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -12,24 +15,16 @@ jobs:
   create-release:
     name: Create Release
     runs-on: ubuntu-latest
-    outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
-      version: ${{ steps.get_version.outputs.version }}
     steps:
-      - name: Get version from tag
-        id: get_version
-        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      - uses: actions/checkout@v4
 
       - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref_name }}
-          release_name: ipcalc ${{ github.ref_name }}
-          draft: false
-          prerelease: false
+        run: |
+          gh release create ${{ github.ref_name }} \
+            --title "ipcalc ${{ github.ref_name }}" \
+            --notes "Release ${{ github.ref_name }}"
 
   build:
     name: Build ${{ matrix.target }}
@@ -83,6 +78,8 @@ jobs:
           else
             cargo build --release --target ${{ matrix.target }}
           fi
+          # Save the default binary
+          cp target/${{ matrix.target }}/release/ipcalc target/${{ matrix.target }}/release/ipcalc-default
 
       # Build with all features (includes tui)
       - name: Build binary (all features)
@@ -98,55 +95,23 @@ jobs:
         run: |
           cd target/${{ matrix.target }}/release
 
-          # Default binary
+          # Package all-features binary first (currently named 'ipcalc')
+          tar czf ${{ matrix.name }}-full.tar.gz ipcalc
+          shasum -a 256 ${{ matrix.name }}-full.tar.gz > ${{ matrix.name }}-full.tar.gz.sha256
+
+          # Now package default binary (rename ipcalc-default to ipcalc for the archive)
+          mv ipcalc-default ipcalc
           tar czf ${{ matrix.name }}.tar.gz ipcalc
           shasum -a 256 ${{ matrix.name }}.tar.gz > ${{ matrix.name }}.tar.gz.sha256
 
-          # All-features binary (with TUI)
-          mv ipcalc ipcalc-full
-          tar czf ${{ matrix.name }}-full.tar.gz ipcalc-full
-          shasum -a 256 ${{ matrix.name }}-full.tar.gz > ${{ matrix.name }}-full.tar.gz.sha256
-
-      # Upload default binary
-      - name: Upload default binary
-        uses: actions/upload-release-asset@v1
+      # Upload all binaries and checksums
+      - name: Upload release assets
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: target/${{ matrix.target }}/release/${{ matrix.name }}.tar.gz
-          asset_name: ${{ matrix.name }}.tar.gz
-          asset_content_type: application/gzip
-
-      # Upload default binary checksum
-      - name: Upload default binary checksum
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: target/${{ matrix.target }}/release/${{ matrix.name }}.tar.gz.sha256
-          asset_name: ${{ matrix.name }}.tar.gz.sha256
-          asset_content_type: text/plain
-
-      # Upload full binary (with TUI)
-      - name: Upload full binary
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: target/${{ matrix.target }}/release/${{ matrix.name }}-full.tar.gz
-          asset_name: ${{ matrix.name }}-full.tar.gz
-          asset_content_type: application/gzip
-
-      # Upload full binary checksum
-      - name: Upload full binary checksum
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: target/${{ matrix.target }}/release/${{ matrix.name }}-full.tar.gz.sha256
-          asset_name: ${{ matrix.name }}-full.tar.gz.sha256
-          asset_content_type: text/plain
+        run: |
+          cd target/${{ matrix.target }}/release
+          gh release upload ${{ github.ref_name }} \
+            ${{ matrix.name }}.tar.gz \
+            ${{ matrix.name }}.tar.gz.sha256 \
+            ${{ matrix.name }}-full.tar.gz \
+            ${{ matrix.name }}-full.tar.gz.sha256
