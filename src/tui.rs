@@ -1,13 +1,13 @@
 #[cfg(feature = "tui")]
-use std::io;
-#[cfg(feature = "tui")]
 use crossterm::{
     event::{self, Event, KeyCode},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 #[cfg(feature = "tui")]
 use ratatui::{prelude::*, widgets::*};
+#[cfg(feature = "tui")]
+use std::io;
 
 #[cfg(feature = "tui")]
 use crate::subnet_generator::{generate_ipv4_subnets, generate_ipv6_subnets};
@@ -178,10 +178,10 @@ fn ui(f: &mut Frame, app: &AppState) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(1),  // Mode indicator
-            Constraint::Length(5),  // Input fields
-            Constraint::Min(10),    // Results
-            Constraint::Length(3),  // Help
+            Constraint::Length(1), // Mode indicator
+            Constraint::Length(5), // Input fields
+            Constraint::Min(10),   // Results
+            Constraint::Length(3), // Help
         ])
         .split(f.size());
 
@@ -190,8 +190,8 @@ fn ui(f: &mut Frame, app: &AppState) {
         Mode::Calculate => " MODE: Calculate (press TAB to switch to Split) ",
         Mode::Split => " MODE: Split (press TAB to switch to Calculate) ",
     };
-    let mode_widget = Paragraph::new(mode_text)
-        .style(Style::default().bg(Color::Blue).fg(Color::White).bold());
+    let mode_widget =
+        Paragraph::new(mode_text).style(Style::default().bg(Color::Blue).fg(Color::White).bold());
     f.render_widget(mode_widget, chunks[0]);
 
     // Input fields
@@ -209,10 +209,11 @@ fn ui(f: &mut Frame, app: &AppState) {
     // Help bar
     let help_text = match app.mode {
         Mode::Calculate => " ESC: Quit | TAB: Switch Mode | Type to edit CIDR ",
-        Mode::Split => " ESC: Quit | TAB: Switch Mode | ENTER: Next Field | M: Toggle Max | ↑↓: Scroll ",
+        Mode::Split => {
+            " ESC: Quit | TAB: Switch Mode | ENTER: Next Field | M: Toggle Max | ↑↓: Scroll "
+        }
     };
-    let help = Paragraph::new(help_text)
-        .block(Block::default().borders(Borders::ALL));
+    let help = Paragraph::new(help_text).block(Block::default().borders(Borders::ALL));
     f.render_widget(help, chunks[3]);
 }
 
@@ -220,9 +221,11 @@ fn ui(f: &mut Frame, app: &AppState) {
 fn render_calculate_inputs(f: &mut Frame, app: &AppState, area: Rect) {
     let input_style = Style::default().fg(Color::Yellow);
     let input_text = format!(" {} ", app.cidr_input);
-    let input_panel = Paragraph::new(input_text)
-        .style(input_style)
-        .block(Block::default().borders(Borders::ALL).title(" Enter CIDR (e.g. 192.168.1.0/24) "));
+    let input_panel = Paragraph::new(input_text).style(input_style).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(" Enter CIDR (e.g. 192.168.1.0/24) "),
+    );
     f.render_widget(input_panel, area);
 }
 
@@ -272,9 +275,11 @@ fn render_split_inputs(f: &mut Frame, app: &AppState, area: Rect) {
     } else {
         format!(" {} ", app.count_input)
     };
-    let count_panel = Paragraph::new(count_text)
-        .style(count_style)
-        .block(Block::default().borders(Borders::ALL).title(" Count (or M for MAX) "));
+    let count_panel = Paragraph::new(count_text).style(count_style).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(" Count (or M for MAX) "),
+    );
     f.render_widget(count_panel, input_chunks[2]);
 }
 
@@ -297,7 +302,11 @@ fn render_calculate_results(f: &mut Frame, app: &AppState, area: Rect) {
     };
 
     let results = Paragraph::new(display_text)
-        .block(Block::default().borders(Borders::ALL).title(" Calculations "))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" Calculations "),
+        )
         .style(Style::default().fg(Color::Cyan));
     f.render_widget(results, area);
 }
@@ -307,7 +316,11 @@ fn render_split_results(f: &mut Frame, app: &AppState, area: Rect) {
     if app.cidr_input.is_empty() || app.prefix_input.is_empty() {
         let help_text = "Enter CIDR and new prefix length to generate subnets";
         let results = Paragraph::new(help_text)
-            .block(Block::default().borders(Borders::ALL).title(" Split Results "))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(" Split Results "),
+            )
             .style(Style::default().fg(Color::DarkGray));
         f.render_widget(results, area);
         return;
@@ -316,7 +329,11 @@ fn render_split_results(f: &mut Frame, app: &AppState, area: Rect) {
     if app.mode == Mode::Split && !app.use_max && app.count_input.is_empty() {
         let help_text = "Enter count or press 'M' for maximum subnets";
         let results = Paragraph::new(help_text)
-            .block(Block::default().borders(Borders::ALL).title(" Split Results "))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(" Split Results "),
+            )
             .style(Style::default().fg(Color::DarkGray));
         f.render_widget(results, area);
         return;
@@ -328,7 +345,11 @@ fn render_split_results(f: &mut Frame, app: &AppState, area: Rect) {
         Err(_) => {
             let error_text = "Invalid prefix length";
             let results = Paragraph::new(error_text)
-                .block(Block::default().borders(Borders::ALL).title(" Split Results "))
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title(" Split Results "),
+                )
                 .style(Style::default().fg(Color::Red));
             f.render_widget(results, area);
             return;
@@ -343,7 +364,11 @@ fn render_split_results(f: &mut Frame, app: &AppState, area: Rect) {
             Err(_) => {
                 let error_text = "Invalid count";
                 let results = Paragraph::new(error_text)
-                    .block(Block::default().borders(Borders::ALL).title(" Split Results "))
+                    .block(
+                        Block::default()
+                            .borders(Borders::ALL)
+                            .title(" Split Results "),
+                    )
                     .style(Style::default().fg(Color::Red));
                 f.render_widget(results, area);
                 return;
@@ -367,11 +392,24 @@ fn render_split_results(f: &mut Frame, app: &AppState, area: Rect) {
                 ];
 
                 let visible_height = area.height.saturating_sub(7) as usize; // Account for borders and header
-                let start = app.scroll_offset.min(result.subnets.len().saturating_sub(1));
+                let start = app
+                    .scroll_offset
+                    .min(result.subnets.len().saturating_sub(1));
                 let end = (start + visible_height).min(result.subnets.len());
 
-                for (i, subnet) in result.subnets.iter().enumerate().skip(start).take(end - start) {
-                    lines.push(format!("  {}: {}/{}", i + 1, subnet.network_address, subnet.prefix_length));
+                for (i, subnet) in result
+                    .subnets
+                    .iter()
+                    .enumerate()
+                    .skip(start)
+                    .take(end - start)
+                {
+                    lines.push(format!(
+                        "  {}: {}/{}",
+                        i + 1,
+                        subnet.network_address,
+                        subnet.prefix_length
+                    ));
                 }
 
                 if result.subnets.len() > visible_height {
@@ -400,11 +438,24 @@ fn render_split_results(f: &mut Frame, app: &AppState, area: Rect) {
                 ];
 
                 let visible_height = area.height.saturating_sub(7) as usize; // Account for borders and header
-                let start = app.scroll_offset.min(result.subnets.len().saturating_sub(1));
+                let start = app
+                    .scroll_offset
+                    .min(result.subnets.len().saturating_sub(1));
                 let end = (start + visible_height).min(result.subnets.len());
 
-                for (i, subnet) in result.subnets.iter().enumerate().skip(start).take(end - start) {
-                    lines.push(format!("  {}: {}/{}", i + 1, subnet.network_address, subnet.prefix_length));
+                for (i, subnet) in result
+                    .subnets
+                    .iter()
+                    .enumerate()
+                    .skip(start)
+                    .take(end - start)
+                {
+                    lines.push(format!(
+                        "  {}: {}/{}",
+                        i + 1,
+                        subnet.network_address,
+                        subnet.prefix_length
+                    ));
                 }
 
                 if result.subnets.len() > visible_height {
@@ -424,7 +475,11 @@ fn render_split_results(f: &mut Frame, app: &AppState, area: Rect) {
     };
 
     let results = Paragraph::new(result_text)
-        .block(Block::default().borders(Borders::ALL).title(" Split Results "))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" Split Results "),
+        )
         .style(Style::default().fg(Color::Green))
         .scroll((0, 0));
     f.render_widget(results, area);
