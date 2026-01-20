@@ -1,8 +1,8 @@
 use axum::{
     Router,
     extract::Query,
-    http::StatusCode,
-    response::{IntoResponse, Json},
+    http::{StatusCode, header},
+    response::{IntoResponse, Json, Response},
     routing::get,
 };
 use serde::{Deserialize, Serialize};
@@ -49,6 +49,9 @@ pub struct ApiDoc;
 pub struct SubnetQuery {
     /// IP address in CIDR notation (e.g., 192.168.1.0/24 or 2001:db8::/48)
     cidr: String,
+    /// Pretty print JSON output
+    #[serde(default)]
+    pretty: bool,
 }
 
 #[derive(Deserialize)]
@@ -63,6 +66,9 @@ pub struct SplitQuery {
     /// Generate maximum number of subnets possible.
     #[serde(default)]
     max: bool,
+    /// Pretty print JSON output
+    #[serde(default)]
+    pretty: bool,
 }
 
 #[derive(Serialize)]
@@ -124,6 +130,21 @@ async fn version() -> Json<VersionResponse> {
     })
 }
 
+/// Helper function to format JSON responses with optional pretty printing
+fn json_response<T: Serialize>(value: T, pretty: bool, status: StatusCode) -> Response {
+    let json_string = if pretty {
+        serde_json::to_string_pretty(&value).unwrap()
+    } else {
+        serde_json::to_string(&value).unwrap()
+    };
+
+    Response::builder()
+        .status(status)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(json_string.into())
+        .unwrap()
+}
+
 #[cfg_attr(feature = "swagger", utoipa::path(
     get,
     path = "/v4",
@@ -142,18 +163,16 @@ async fn calculate_ipv4(Query(params): Query<SubnetQuery>) -> impl IntoResponse 
     match Ipv4Subnet::from_cidr(&params.cidr) {
         Ok(subnet) => {
             info!(network = %subnet.network_address, "IPv4 calculation successful");
-            (StatusCode::OK, Json(serde_json::to_value(subnet).unwrap()))
+            json_response(subnet, params.pretty, StatusCode::OK)
         }
         Err(e) => {
             warn!(error = %e, "IPv4 calculation failed");
-            (
+            json_response(
+                ErrorResponse {
+                    error: e.to_string(),
+                },
+                params.pretty,
                 StatusCode::BAD_REQUEST,
-                Json(
-                    serde_json::to_value(ErrorResponse {
-                        error: e.to_string(),
-                    })
-                    .unwrap(),
-                ),
             )
         }
     }
@@ -177,18 +196,16 @@ async fn calculate_ipv6(Query(params): Query<SubnetQuery>) -> impl IntoResponse 
     match Ipv6Subnet::from_cidr(&params.cidr) {
         Ok(subnet) => {
             info!(network = %subnet.network_address, "IPv6 calculation successful");
-            (StatusCode::OK, Json(serde_json::to_value(subnet).unwrap()))
+            json_response(subnet, params.pretty, StatusCode::OK)
         }
         Err(e) => {
             warn!(error = %e, "IPv6 calculation failed");
-            (
+            json_response(
+                ErrorResponse {
+                    error: e.to_string(),
+                },
+                params.pretty,
                 StatusCode::BAD_REQUEST,
-                Json(
-                    serde_json::to_value(ErrorResponse {
-                        error: e.to_string(),
-                    })
-                    .unwrap(),
-                ),
             )
         }
     }
@@ -218,14 +235,12 @@ async fn split_ipv4(Query(params): Query<SplitQuery>) -> impl IntoResponse {
             Some(c) => Some(c),
             None => {
                 warn!("Neither count nor max specified");
-                return (
+                return json_response(
+                    ErrorResponse {
+                        error: "Either 'count' or 'max=true' must be specified".to_string(),
+                    },
+                    params.pretty,
                     StatusCode::BAD_REQUEST,
-                    Json(
-                        serde_json::to_value(ErrorResponse {
-                            error: "Either 'count' or 'max=true' must be specified".to_string(),
-                        })
-                        .unwrap(),
-                    ),
                 );
             }
         }
@@ -237,18 +252,16 @@ async fn split_ipv4(Query(params): Query<SplitQuery>) -> impl IntoResponse {
                 subnets_generated = result.subnets.len(),
                 "IPv4 split successful"
             );
-            (StatusCode::OK, Json(serde_json::to_value(result).unwrap()))
+            json_response(result, params.pretty, StatusCode::OK)
         }
         Err(e) => {
             warn!(error = %e, "IPv4 split failed");
-            (
+            json_response(
+                ErrorResponse {
+                    error: e.to_string(),
+                },
+                params.pretty,
                 StatusCode::BAD_REQUEST,
-                Json(
-                    serde_json::to_value(ErrorResponse {
-                        error: e.to_string(),
-                    })
-                    .unwrap(),
-                ),
             )
         }
     }
@@ -278,14 +291,12 @@ async fn split_ipv6(Query(params): Query<SplitQuery>) -> impl IntoResponse {
             Some(c) => Some(c),
             None => {
                 warn!("Neither count nor max specified");
-                return (
+                return json_response(
+                    ErrorResponse {
+                        error: "Either 'count' or 'max=true' must be specified".to_string(),
+                    },
+                    params.pretty,
                     StatusCode::BAD_REQUEST,
-                    Json(
-                        serde_json::to_value(ErrorResponse {
-                            error: "Either 'count' or 'max=true' must be specified".to_string(),
-                        })
-                        .unwrap(),
-                    ),
                 );
             }
         }
@@ -297,18 +308,16 @@ async fn split_ipv6(Query(params): Query<SplitQuery>) -> impl IntoResponse {
                 subnets_generated = result.subnets.len(),
                 "IPv6 split successful"
             );
-            (StatusCode::OK, Json(serde_json::to_value(result).unwrap()))
+            json_response(result, params.pretty, StatusCode::OK)
         }
         Err(e) => {
             warn!(error = %e, "IPv6 split failed");
-            (
+            json_response(
+                ErrorResponse {
+                    error: e.to_string(),
+                },
+                params.pretty,
                 StatusCode::BAD_REQUEST,
-                Json(
-                    serde_json::to_value(ErrorResponse {
-                        error: e.to_string(),
-                    })
-                    .unwrap(),
-                ),
             )
         }
     }
