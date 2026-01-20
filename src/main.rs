@@ -10,9 +10,6 @@ use std::io::{self, Write};
 use std::net::SocketAddr;
 use tracing::info;
 
-#[cfg(feature = "tui")]
-mod tui;
-
 /// Print to stdout, handling broken pipe errors gracefully.
 /// When output is piped to commands like `head`, the pipe may close early.
 fn print_stdout(s: &str) {
@@ -32,7 +29,7 @@ async fn main() {
     // Launch TUI mode if requested
     #[cfg(feature = "tui")]
     if cli.tui {
-        if let Err(e) = tui::run_tui() {
+        if let Err(e) = ipcalc::tui::run_tui() {
             eprintln!("TUI Error: {}", e);
         }
         return;

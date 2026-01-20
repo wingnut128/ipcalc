@@ -7,6 +7,9 @@ pub mod logging;
 pub mod output;
 pub mod subnet_generator;
 
+#[cfg(feature = "tui")]
+pub mod tui;
+
 pub use error::IpCalcError;
 pub use ipv4::Ipv4Subnet;
 pub use ipv6::Ipv6Subnet;
