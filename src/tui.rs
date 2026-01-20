@@ -183,7 +183,7 @@ fn ui(f: &mut Frame, app: &AppState) {
             Constraint::Min(10),   // Results
             Constraint::Length(3), // Help
         ])
-        .split(f.size());
+        .split(f.area());
 
     // Mode indicator
     let mode_text = match app.mode {

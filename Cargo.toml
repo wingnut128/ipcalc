@@ -19,7 +19,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 tracing-appender = "0.2"
 tower-http = { version = "0.6", features = ["trace"] }
-ratatui = { version = "0.26", optional = true }
+ratatui = { version = "0.30", optional = true }
 crossterm = { version = "0.27", optional = true }
 ipnet = { version = "2", optional = true }
 
