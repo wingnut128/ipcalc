@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.3.1] - 2026-01-20
 
+### Added
+
+- Optional `?pretty=true` query parameter for API endpoints to format JSON output with indentation
+- Improved API readability for browser and debugging use cases
+
 ### Security
 
 - Fixed RUSTSEC-2026-0002 / GHSA-rhfx-m35p-ff5j: Updated `ratatui` from 0.26 to 0.30, which resolves low severity vulnerability in `lru` crate (IterMut Stacked Borrows violation)
@@ -17,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Updated deprecated `Frame::size()` call to `Frame::area()` for ratatui 0.30 compatibility
+- API responses default to compact JSON for optimal performance
 
 ## [0.3.0] - 2026-01-20 [YANKED]
 
