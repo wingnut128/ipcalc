@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-01-20
+
+### Added
+
+- Interactive Terminal User Interface (TUI) mode with dual-mode operation (optional `tui` feature)
+  - Calculate mode for real-time subnet information display
+  - Split mode for interactive subnet generation with scrollable results
+  - TAB key to switch between Calculate and Split modes
+  - Support for MAX mode to generate all possible subnets
+  - Arrow key navigation for scrolling through generated subnet lists
+  - Color-coded input fields with active field highlighting
+  - Real-time validation and error messages
+  - Automatic IPv4/IPv6 detection
+- `--tui` command-line flag to launch TUI mode (only available when built with `tui` feature)
+- Optional dependencies: `ratatui`, `crossterm`, and `ipnet` for TUI functionality
+
+### Changed
+
+- TUI feature is opt-in and not included in default builds to maintain smaller binary size
+- Module structure reorganized: `tui` module now part of `lib.rs` instead of `main.rs`
+
 ## [0.2.1] - 2026-01-16
 
 ### Fixed

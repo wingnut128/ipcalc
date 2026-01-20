@@ -11,6 +11,7 @@ A fast IPv4 and IPv6 subnet calculator written in Rust. Available as both a CLI 
 - **IPv4 subnet calculations**: network address, broadcast, subnet mask, wildcard mask, host ranges, network class detection
 - **IPv6 prefix calculations**: network address, address ranges, hextet breakdown, address type detection (global unicast, link-local, ULA, etc.)
 - **Subnet splitting**: generate N subnets of a given prefix from a supernet
+- **Interactive TUI**: Terminal user interface with real-time calculations and split mode (optional feature)
 - **Multiple output formats**: JSON (default) or plain text
 - **File output**: write results directly to a file
 - **HTTP API**: REST endpoints for all calculations
@@ -84,6 +85,43 @@ ipcalc split 192.168.0.0/22 -p 27 -n 10
 # Generate 5 /48 subnets from a /32
 ipcalc split 2001:db8::/32 -p 48 -n 5
 ```
+
+### Interactive TUI
+
+Launch an interactive terminal user interface for real-time subnet calculations and splitting:
+
+```bash
+# Build with TUI support
+cargo build --release --features tui
+
+# Run the TUI
+ipcalc --tui
+```
+
+**TUI Features:**
+
+- **Calculate Mode**: Enter any CIDR notation for instant subnet information display
+  - Network address, netmask, broadcast address
+  - First/last host, total hosts
+  - Real-time validation and updates
+
+- **Split Mode**: Interactive subnet splitting with live results
+  - Press **TAB** to switch between Calculate and Split modes
+  - Enter CIDR, target prefix length, and count
+  - Press **M** to toggle MAX mode for generating all possible subnets
+  - Use **↑↓** arrow keys to scroll through generated subnet lists
+  - Press **ENTER** to cycle through input fields
+
+- **Keyboard Controls**:
+  - `TAB` - Switch between Calculate and Split modes
+  - `ENTER` - Move to next input field (Split mode)
+  - `M` - Toggle MAX mode for subnet count (Split mode)
+  - `↑↓` - Scroll through results
+  - `ESC` - Quit
+
+The TUI automatically detects IPv4/IPv6 and provides color-coded input fields with real-time error messages.
+
+**Note:** The TUI feature is optional and must be enabled at build time with the `tui` feature flag. It is not included in the default build to keep the binary size smaller.
 
 ### HTTP API Server
 
@@ -177,11 +215,14 @@ Commands:
 Options:
   -f, --format <FORMAT>  Output format [default: json] [possible values: json, text]
   -o, --output <OUTPUT>  Output file path (prints to stdout if not specified)
+      --tui              Launch interactive TUI mode (requires tui feature)
   -h, --help             Print help
   -V, --version          Print version
 ```
 
-**Note:** The legacy `v4` and `v6` subcommands are still supported for backwards compatibility but are deprecated.
+**Notes:**
+- The legacy `v4` and `v6` subcommands are still supported for backwards compatibility but are deprecated
+- The `--tui` flag is only available when built with the `tui` feature: `cargo build --features tui`
 
 ## Docker
 
