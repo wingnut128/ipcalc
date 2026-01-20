@@ -7,7 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.3.0] - 2026-01-20
+## [0.3.1] - 2026-01-20
+
+### Security
+
+- Fixed RUSTSEC-2026-0002 / GHSA-rhfx-m35p-ff5j: Updated `ratatui` from 0.26 to 0.30, which resolves low severity vulnerability in `lru` crate (IterMut Stacked Borrows violation)
+- Updated `lru` transitive dependency from 0.12.5 to 0.16.3 (patched version)
+
+### Changed
+
+- Updated deprecated `Frame::size()` call to `Frame::area()` for ratatui 0.30 compatibility
+
+## [0.3.0] - 2026-01-20 [YANKED]
+
+**This version has been yanked due to a security vulnerability in a transitive dependency. Please use 0.3.1 or later.**
 
 ### Added
 
@@ -148,7 +161,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dockerfile for containerized deployment
 - Makefile for common development tasks
 
-[Unreleased]: https://github.com/wingnut128/ipcalc/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/wingnut128/ipcalc/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/wingnut128/ipcalc/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/wingnut128/ipcalc/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/wingnut128/ipcalc/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/wingnut128/ipcalc/compare/v0.1.8...v0.2.0
