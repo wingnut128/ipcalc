@@ -1,0 +1,152 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      version: ${{ steps.get_version.outputs.version }}
+    steps:
+      - name: Get version from tag
+        id: get_version
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: ipcalc ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: create-release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          # Linux x86_64
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            name: ipcalc-linux-amd64
+
+          # Linux ARM64
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            name: ipcalc-linux-arm64
+            cross: true
+
+          # macOS x86_64
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            name: ipcalc-macos-amd64
+
+          # macOS ARM64
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            name: ipcalc-macos-arm64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      # Install cross for cross-compilation
+      - name: Install cross
+        if: matrix.cross
+        run: cargo install cross --git https://github.com/cross-rs/cross
+
+      # Build with default features (includes swagger)
+      - name: Build binary (default features)
+        run: |
+          if [ "${{ matrix.cross }}" = "true" ]; then
+            cross build --release --target ${{ matrix.target }}
+          else
+            cargo build --release --target ${{ matrix.target }}
+          fi
+
+      # Build with all features (includes tui)
+      - name: Build binary (all features)
+        run: |
+          if [ "${{ matrix.cross }}" = "true" ]; then
+            cross build --release --target ${{ matrix.target }} --all-features
+          else
+            cargo build --release --target ${{ matrix.target }} --all-features
+          fi
+
+      # Package binaries
+      - name: Package binaries
+        run: |
+          cd target/${{ matrix.target }}/release
+
+          # Default binary
+          tar czf ${{ matrix.name }}.tar.gz ipcalc
+          shasum -a 256 ${{ matrix.name }}.tar.gz > ${{ matrix.name }}.tar.gz.sha256
+
+          # All-features binary (with TUI)
+          mv ipcalc ipcalc-full
+          tar czf ${{ matrix.name }}-full.tar.gz ipcalc-full
+          shasum -a 256 ${{ matrix.name }}-full.tar.gz > ${{ matrix.name }}-full.tar.gz.sha256
+
+      # Upload default binary
+      - name: Upload default binary
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: target/${{ matrix.target }}/release/${{ matrix.name }}.tar.gz
+          asset_name: ${{ matrix.name }}.tar.gz
+          asset_content_type: application/gzip
+
+      # Upload default binary checksum
+      - name: Upload default binary checksum
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: target/${{ matrix.target }}/release/${{ matrix.name }}.tar.gz.sha256
+          asset_name: ${{ matrix.name }}.tar.gz.sha256
+          asset_content_type: text/plain
+
+      # Upload full binary (with TUI)
+      - name: Upload full binary
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: target/${{ matrix.target }}/release/${{ matrix.name }}-full.tar.gz
+          asset_name: ${{ matrix.name }}-full.tar.gz
+          asset_content_type: application/gzip
+
+      # Upload full binary checksum
+      - name: Upload full binary checksum
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: target/${{ matrix.target }}/release/${{ matrix.name }}-full.tar.gz.sha256
+          asset_name: ${{ matrix.name }}-full.tar.gz.sha256
+          asset_content_type: text/plain
