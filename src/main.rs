@@ -10,6 +10,9 @@ use std::io::{self, Write};
 use std::net::SocketAddr;
 use tracing::info;
 
+#[cfg(feature = "tui")]
+mod tui;
+
 /// Print to stdout, handling broken pipe errors gracefully.
 /// When output is piped to commands like `head`, the pipe may close early.
 fn print_stdout(s: &str) {
@@ -25,6 +28,16 @@ fn print_stdout(s: &str) {
 #[tokio::main]
 async fn main() {
     let cli = Cli::parse();
+
+    // Launch TUI mode if requested
+    #[cfg(feature = "tui")]
+    if cli.tui {
+        if let Err(e) = tui::run_tui() {
+            eprintln!("TUI Error: {}", e);
+        }
+        return;
+    }
+
     let format: OutputFormat = cli.format.into();
     let writer = OutputWriter::new(format, cli.output.clone());
 

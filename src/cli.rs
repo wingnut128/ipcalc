@@ -19,6 +19,11 @@ pub struct Cli {
     /// Output file path (prints to stdout if not specified)
     #[arg(short = 'o', long, global = true)]
     pub output: Option<String>,
+
+    /// Launch interactive TUI mode
+    #[cfg(feature = "tui")]
+    #[arg(long)]
+    pub tui: bool,
 }
 
 #[derive(Subcommand)]
