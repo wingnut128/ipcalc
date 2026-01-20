@@ -2,9 +2,16 @@
 
 ## Supported Versions
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 0.1.x   | :white_check_mark: |
+We actively support and provide security updates for the following versions:
+
+| Version | Supported          | Notes                                    |
+| ------- | ------------------ | ---------------------------------------- |
+| 0.3.x   | :white_check_mark: | Current stable release (recommended)     |
+| 0.2.x   | :x:                | No longer supported                      |
+| 0.1.x   | :x:                | No longer supported                      |
+| < 0.1.0 | :x:                | Pre-release, no support                  |
+
+**Note**: Version 0.3.0 was yanked due to a security vulnerability. Please use 0.3.1 or later.
 
 ## Reporting a Vulnerability
 
