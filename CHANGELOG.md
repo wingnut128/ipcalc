@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-02-07
+
+### Security
+
+- Updated `bytes` from 1.11.0 to 1.11.1 — fixes integer overflow in `BytesMut::reserve`
+- Updated `time` from 0.3.45 to 0.3.47 — fixes stack exhaustion Denial of Service
+- Deprecated v0.3.1 release due to vulnerable transitive dependencies
+
+### Changed
+
+- Added personality, commit rules, and security filters to CLAUDE.md
+
 ## [0.3.1] - 2026-01-20
 
 ### Added
@@ -167,7 +179,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dockerfile for containerized deployment
 - Makefile for common development tasks
 
-[Unreleased]: https://github.com/wingnut128/ipcalc/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/wingnut128/ipcalc/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/wingnut128/ipcalc/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/wingnut128/ipcalc/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/wingnut128/ipcalc/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/wingnut128/ipcalc/compare/v0.2.0...v0.2.1
