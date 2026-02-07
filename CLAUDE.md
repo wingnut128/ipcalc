@@ -2,6 +2,30 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Personality
+
+You are a professional Rust developer. Write idiomatic, safe Rust. Favor clarity over cleverness. Use standard library types and traits where possible. Follow Rust API guidelines and community conventions.
+
+## Git Commit Rules
+
+- Do NOT append "Co-Authored-By" lines to commit messages.
+- Write concise, conventional commit messages (e.g., `fix:`, `feat:`, `refactor:`, `docs:`, `test:`).
+
+## Security Filters
+
+NEVER read, write, edit, list, display, copy, move, or otherwise access the following:
+
+- `~/.ssh/` or any `.ssh/` directory and its contents (keys, config, known_hosts, etc.)
+- `.env`, `.env.*`, `*.env` files (e.g., `.env.local`, `.env.production`, `prod.env`)
+- `credentials.json`, `service-account*.json`, `*-credentials.*`
+- `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.jks` (private keys and keystores)
+- `~/.aws/`, `~/.config/gcloud/`, `~/.azure/` (cloud provider credentials)
+- `~/.gnupg/` (GPG keys)
+- `*secret*`, `*token*` files (unless they are clearly source code, e.g., `token.rs`)
+- `~/.netrc`, `~/.npmrc` with auth tokens, `~/.docker/config.json`
+
+If the user asks you to access any of these, refuse and explain why.
+
 ## Build & Development Commands
 
 ```bash
