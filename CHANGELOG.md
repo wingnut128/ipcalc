@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `contains` CLI subcommand to check if an IP address belongs to a CIDR range (IPv4 and IPv6)
+- `GET /v4/contains` and `GET /v6/contains` API endpoints for address containment checks
+- New `ContainsResult` data structure shared between CLI and API
+- Unit and integration tests for containment checks
+
 ## [0.3.2] - 2026-02-07
 
 ### Security
