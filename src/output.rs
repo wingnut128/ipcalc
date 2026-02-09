@@ -1,3 +1,4 @@
+use crate::contains::ContainsResult;
 use crate::error::Result;
 use crate::ipv4::Ipv4Subnet;
 use crate::ipv6::Ipv6Subnet;
@@ -96,6 +97,25 @@ impl TextOutput for Ipv6Subnet {
         writeln!(out, "Total Addresses:     {}", self.total_addresses).unwrap();
         writeln!(out, "Hextets:             {}", self.hextets.join(":")).unwrap();
         writeln!(out, "Address Type:        {}", self.address_type).unwrap();
+        out
+    }
+}
+
+impl TextOutput for ContainsResult {
+    fn to_text(&self) -> String {
+        let mut out = String::new();
+        writeln!(out, "Address Containment Check").unwrap();
+        writeln!(out, "=========================").unwrap();
+        writeln!(out, "Subnet:            {}", self.cidr).unwrap();
+        writeln!(out, "Address:           {}", self.address).unwrap();
+        writeln!(
+            out,
+            "Contained:         {}",
+            if self.contained { "Yes" } else { "No" }
+        )
+        .unwrap();
+        writeln!(out, "Network Address:   {}", self.network_address).unwrap();
+        writeln!(out, "Broadcast Address: {}", self.broadcast_address).unwrap();
         out
     }
 }

@@ -13,6 +13,9 @@ use utoipa::{IntoParams, OpenApi, ToSchema};
 #[cfg(feature = "swagger")]
 use utoipa_swagger_ui::SwaggerUi;
 
+#[cfg(feature = "swagger")]
+use crate::contains::ContainsResult;
+use crate::contains::{check_ipv4_contains, check_ipv6_contains};
 use crate::ipv4::Ipv4Subnet;
 use crate::ipv6::Ipv6Subnet;
 #[cfg(feature = "swagger")]
@@ -29,9 +32,11 @@ use crate::subnet_generator::{generate_ipv4_subnets, generate_ipv6_subnets};
         calculate_ipv6,
         split_ipv4,
         split_ipv6,
+        contains_ipv4,
+        contains_ipv6,
     ),
     components(
-        schemas(Ipv4Subnet, Ipv6Subnet, Ipv4SubnetList, Ipv6SubnetList, SubnetQuery, SplitQuery, ErrorResponse, VersionResponse)
+        schemas(Ipv4Subnet, Ipv6Subnet, Ipv4SubnetList, Ipv6SubnetList, ContainsResult, SubnetQuery, SplitQuery, ContainsQuery, ErrorResponse, VersionResponse)
     ),
     tags(
         (name = "ipcalc", description = "IP subnet calculator API")
@@ -71,6 +76,18 @@ pub struct SplitQuery {
     pretty: bool,
 }
 
+#[derive(Deserialize)]
+#[cfg_attr(feature = "swagger", derive(ToSchema, IntoParams))]
+pub struct ContainsQuery {
+    /// Network in CIDR notation (e.g., 192.168.1.0/24)
+    cidr: String,
+    /// IP address to check (e.g., 192.168.1.100)
+    address: String,
+    /// Pretty print JSON output
+    #[serde(default)]
+    pretty: bool,
+}
+
 #[derive(Serialize)]
 #[cfg_attr(feature = "swagger", derive(ToSchema))]
 struct ErrorResponse {
@@ -94,7 +111,9 @@ pub fn create_router() -> Router {
         .route("/v4", get(calculate_ipv4))
         .route("/v6", get(calculate_ipv6))
         .route("/v4/split", get(split_ipv4))
-        .route("/v6/split", get(split_ipv6));
+        .route("/v6/split", get(split_ipv6))
+        .route("/v4/contains", get(contains_ipv4))
+        .route("/v6/contains", get(contains_ipv6));
 
     #[cfg(feature = "swagger")]
     let router = router
@@ -312,6 +331,78 @@ async fn split_ipv6(Query(params): Query<SplitQuery>) -> impl IntoResponse {
         }
         Err(e) => {
             warn!(error = %e, "IPv6 split failed");
+            json_response(
+                ErrorResponse {
+                    error: e.to_string(),
+                },
+                params.pretty,
+                StatusCode::BAD_REQUEST,
+            )
+        }
+    }
+}
+
+#[cfg_attr(feature = "swagger", utoipa::path(
+    get,
+    path = "/v4/contains",
+    params(
+        ContainsQuery
+    ),
+    responses(
+        (status = 200, description = "IPv4 containment check result", body = ContainsResult),
+        (status = 400, description = "Invalid parameters", body = ErrorResponse)
+    ),
+    tag = "ipcalc"
+))]
+#[instrument(skip_all, fields(cidr = %params.cidr, address = %params.address))]
+async fn contains_ipv4(Query(params): Query<ContainsQuery>) -> impl IntoResponse {
+    info!("Checking IPv4 address containment");
+    match check_ipv4_contains(&params.cidr, &params.address) {
+        Ok(result) => {
+            info!(
+                contained = result.contained,
+                "IPv4 containment check successful"
+            );
+            json_response(result, params.pretty, StatusCode::OK)
+        }
+        Err(e) => {
+            warn!(error = %e, "IPv4 containment check failed");
+            json_response(
+                ErrorResponse {
+                    error: e.to_string(),
+                },
+                params.pretty,
+                StatusCode::BAD_REQUEST,
+            )
+        }
+    }
+}
+
+#[cfg_attr(feature = "swagger", utoipa::path(
+    get,
+    path = "/v6/contains",
+    params(
+        ContainsQuery
+    ),
+    responses(
+        (status = 200, description = "IPv6 containment check result", body = ContainsResult),
+        (status = 400, description = "Invalid parameters", body = ErrorResponse)
+    ),
+    tag = "ipcalc"
+))]
+#[instrument(skip_all, fields(cidr = %params.cidr, address = %params.address))]
+async fn contains_ipv6(Query(params): Query<ContainsQuery>) -> impl IntoResponse {
+    info!("Checking IPv6 address containment");
+    match check_ipv6_contains(&params.cidr, &params.address) {
+        Ok(result) => {
+            info!(
+                contained = result.contained,
+                "IPv6 containment check successful"
+            );
+            json_response(result, params.pretty, StatusCode::OK)
+        }
+        Err(e) => {
+            warn!(error = %e, "IPv6 containment check failed");
             json_response(
                 ErrorResponse {
                     error: e.to_string(),

@@ -191,3 +191,57 @@ fn test_v6_deprecation_warning() {
     let json: serde_json::Value = serde_json::from_str(&stdout).expect("Invalid JSON");
     assert_eq!(json["network_address"], "2001:db8::");
 }
+
+#[test]
+fn test_contains_ipv4_json() {
+    let (stdout, _, success) = run_ipcalc(&["contains", "192.168.1.0/24", "192.168.1.100"]);
+    assert!(success);
+
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("Invalid JSON");
+    assert_eq!(json["cidr"], "192.168.1.0/24");
+    assert_eq!(json["address"], "192.168.1.100");
+    assert_eq!(json["contained"], true);
+    assert_eq!(json["network_address"], "192.168.1.0");
+    assert_eq!(json["broadcast_address"], "192.168.1.255");
+}
+
+#[test]
+fn test_contains_ipv4_not_contained() {
+    let (stdout, _, success) = run_ipcalc(&["contains", "192.168.1.0/24", "10.0.0.1"]);
+    assert!(success);
+
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("Invalid JSON");
+    assert_eq!(json["contained"], false);
+}
+
+#[test]
+fn test_contains_ipv6_json() {
+    let (stdout, _, success) = run_ipcalc(&["contains", "2001:db8::/32", "2001:db8::1"]);
+    assert!(success);
+
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("Invalid JSON");
+    assert_eq!(json["contained"], true);
+    assert_eq!(json["address"], "2001:db8::1");
+}
+
+#[test]
+fn test_contains_ipv4_text() {
+    let (stdout, _, success) = run_ipcalc(&[
+        "contains",
+        "192.168.1.0/24",
+        "192.168.1.100",
+        "--format",
+        "text",
+    ]);
+    assert!(success);
+    assert!(stdout.contains("Address Containment Check"));
+    assert!(stdout.contains("Contained:         Yes"));
+    assert!(stdout.contains("Network Address:   192.168.1.0"));
+}
+
+#[test]
+fn test_contains_invalid_address() {
+    let (_, stderr, success) = run_ipcalc(&["contains", "192.168.1.0/24", "not-an-ip"]);
+    assert!(!success);
+    assert!(stderr.contains("Error"));
+}

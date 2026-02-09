@@ -60,6 +60,14 @@ pub enum Commands {
         max: bool,
     },
 
+    /// Check if an IP address is contained in a subnet
+    Contains {
+        /// Network in CIDR notation (e.g., 192.168.1.0/24)
+        cidr: String,
+        /// IP address to check (e.g., 192.168.1.100)
+        address: String,
+    },
+
     /// Start the HTTP API server
     Serve {
         /// Address to bind to

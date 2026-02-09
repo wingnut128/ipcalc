@@ -1,6 +1,7 @@
 use clap::{CommandFactory, Parser};
 use ipcalc::api::create_router;
 use ipcalc::cli::{Cli, Commands};
+use ipcalc::contains::{check_ipv4_contains, check_ipv6_contains};
 use ipcalc::ipv4::Ipv4Subnet;
 use ipcalc::ipv6::Ipv6Subnet;
 use ipcalc::logging::{LogConfig, init_logging, parse_log_level};
@@ -153,6 +154,29 @@ async fn main() {
                 }
             }
         }
+        Some(Commands::Contains { cidr, address }) => {
+            let is_ipv6 = cidr.contains(':');
+            let result = if is_ipv6 {
+                check_ipv6_contains(&cidr, &address)
+            } else {
+                check_ipv4_contains(&cidr, &address)
+            };
+
+            match result {
+                Ok(contains_result) => {
+                    let output = writer
+                        .write(&contains_result)
+                        .expect("Failed to write output");
+                    if cli.output.is_none() {
+                        print_stdout(&output);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
         Some(Commands::Serve {
             address,
             port,
@@ -195,6 +219,8 @@ async fn main() {
             println!("  GET /v6?cidr=<cidr>      - Calculate IPv6 subnet");
             println!("  GET /v4/split?cidr=<cidr>&prefix=<n>&count=<n> - Split IPv4 supernet");
             println!("  GET /v6/split?cidr=<cidr>&prefix=<n>&count=<n> - Split IPv6 supernet");
+            println!("  GET /v4/contains?cidr=<cidr>&address=<ip>     - Check IPv4 containment");
+            println!("  GET /v6/contains?cidr=<cidr>&address=<ip>     - Check IPv6 containment");
             #[cfg(feature = "swagger")]
             {
                 println!("  GET /swagger-ui          - Interactive API documentation");
