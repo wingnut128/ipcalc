@@ -11,6 +11,7 @@ A fast IPv4 and IPv6 subnet calculator written in Rust. Available as both a CLI 
 - **IPv4 subnet calculations**: network address, broadcast, subnet mask, wildcard mask, host ranges, network class detection
 - **IPv6 prefix calculations**: network address, address ranges, hextet breakdown, address type detection (global unicast, link-local, ULA, etc.)
 - **Subnet splitting**: generate N subnets of a given prefix from a supernet
+- **Address containment**: check if an IP address belongs to a CIDR range
 - **Interactive TUI**: Terminal user interface with real-time calculations and split mode (optional feature)
 - **Multiple output formats**: JSON (default) or plain text
 - **File output**: write results directly to a file
@@ -86,6 +87,21 @@ ipcalc split 192.168.0.0/22 -p 27 -n 10
 ipcalc split 2001:db8::/32 -p 48 -n 5
 ```
 
+### Address Containment
+
+Check if an IP address is contained within a subnet:
+
+```bash
+# IPv4 — JSON output
+ipcalc contains 192.168.1.0/24 192.168.1.100
+
+# IPv4 — text output
+ipcalc contains 192.168.1.0/24 10.0.0.1 --format text
+
+# IPv6
+ipcalc contains 2001:db8::/32 2001:db8::1
+```
+
 ### Interactive TUI
 
 Launch an interactive terminal user interface for real-time subnet calculations and splitting:
@@ -146,6 +162,8 @@ ipcalc serve --log-level debug --log-file /var/log/ipcalc.log
 | `GET /v6?cidr=<cidr>` | IPv6 calculation | `/v6?cidr=2001:db8::/32` |
 | `GET /v4/split?cidr=<cidr>&prefix=<n>&count=<n>` | Split IPv4 supernet | `/v4/split?cidr=10.0.0.0/8&prefix=16&count=5` |
 | `GET /v6/split?cidr=<cidr>&prefix=<n>&count=<n>` | Split IPv6 supernet | `/v6/split?cidr=2001:db8::/32&prefix=48&count=10` |
+| `GET /v4/contains?cidr=<cidr>&address=<ip>` | Check IPv4 containment | `/v4/contains?cidr=192.168.1.0/24&address=192.168.1.100` |
+| `GET /v6/contains?cidr=<cidr>&address=<ip>` | Check IPv6 containment | `/v6/contains?cidr=2001:db8::/32&address=2001:db8::1` |
 | `GET /swagger-ui` | Interactive Swagger UI | `/swagger-ui` |
 | `GET /api-docs/openapi.json` | OpenAPI 3.0 specification | `/api-docs/openapi.json` |
 
@@ -160,6 +178,9 @@ curl "http://localhost:8080/v6?cidr=2001:db8::/32"
 
 # Split a /22 into /27 subnets
 curl "http://localhost:8080/v4/split?cidr=192.168.0.0/22&prefix=27&count=10"
+
+# Check if address is in subnet
+curl "http://localhost:8080/v4/contains?cidr=192.168.1.0/24&address=192.168.1.100"
 
 # Get OpenAPI specification
 curl "http://localhost:8080/api-docs/openapi.json"
@@ -208,9 +229,10 @@ Arguments:
   [CIDR]  IP address in CIDR notation (e.g., 192.168.1.0/24 or 2001:db8::/48)
 
 Commands:
-  split  Generate subnets from a supernet
-  serve  Start the HTTP API server
-  help   Print help for a command
+  split     Generate subnets from a supernet
+  contains  Check if an IP address is contained in a subnet
+  serve     Start the HTTP API server
+  help      Print help for a command
 
 Options:
   -f, --format <FORMAT>  Output format [default: json] [possible values: json, text]
