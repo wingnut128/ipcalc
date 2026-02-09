@@ -29,6 +29,8 @@ utoipa-swagger-ui = { version = "9", features = ["axum"], optional = true }
 
 [dev-dependencies]
 tokio-test = "0.4"
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"
 
 [features]
 default = ["swagger"]

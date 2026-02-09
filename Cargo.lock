@@ -919,11 +919,12 @@ dependencies = [
 
 [[package]]
 name = "ipcalc"
-version = "0.3.2"
+version = "0.4.0"
 dependencies = [
  "axum",
  "clap",
  "crossterm 0.27.0",
+ "http-body-util",
  "ipnet",
  "ratatui",
  "serde",
@@ -931,6 +932,7 @@ dependencies = [
  "thiserror 2.0.17",
  "tokio",
  "tokio-test",
+ "tower",
  "tower-http",
  "tracing",
  "tracing-appender",
