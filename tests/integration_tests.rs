@@ -290,3 +290,49 @@ fn test_split_limit_exceeded_ipv6() {
     assert!(!success);
     assert!(stderr.contains("limit"));
 }
+
+#[test]
+fn test_summarize_ipv4_json() {
+    let (stdout, _, success) = run_ipcalc(&["summarize", "192.168.0.0/24", "192.168.1.0/24"]);
+    assert!(success);
+
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("Invalid JSON");
+    assert_eq!(json["input_count"], 2);
+    assert_eq!(json["output_count"], 1);
+    assert_eq!(json["cidrs"][0]["network_address"], "192.168.0.0");
+    assert_eq!(json["cidrs"][0]["prefix_length"], 23);
+}
+
+#[test]
+fn test_summarize_ipv4_text() {
+    let (stdout, _, success) = run_ipcalc(&[
+        "summarize",
+        "192.168.0.0/24",
+        "192.168.1.0/24",
+        "--format",
+        "text",
+    ]);
+    assert!(success);
+    assert!(stdout.contains("CIDR Summarization"));
+    assert!(stdout.contains("Input CIDRs:   2"));
+    assert!(stdout.contains("Output CIDRs:  1"));
+}
+
+#[test]
+fn test_summarize_ipv6_json() {
+    let (stdout, _, success) = run_ipcalc(&["summarize", "2001:db8::/48", "2001:db8:1::/48"]);
+    assert!(success);
+
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("Invalid JSON");
+    assert_eq!(json["input_count"], 2);
+    assert_eq!(json["output_count"], 1);
+    assert_eq!(json["cidrs"][0]["network_address"], "2001:db8::");
+    assert_eq!(json["cidrs"][0]["prefix_length"], 47);
+}
+
+#[test]
+fn test_summarize_empty() {
+    let (_, stderr, success) = run_ipcalc(&["summarize"]);
+    assert!(!success);
+    assert!(stderr.contains("required"));
+}

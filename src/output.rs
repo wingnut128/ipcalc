@@ -3,6 +3,7 @@ use crate::error::Result;
 use crate::ipv4::Ipv4Subnet;
 use crate::ipv6::Ipv6Subnet;
 use crate::subnet_generator::{Ipv4SubnetList, Ipv6SubnetList, SplitSummary};
+use crate::summarize::{Ipv4SummaryResult, Ipv6SummaryResult};
 use serde::Serialize;
 use std::fmt::Write as FmtWrite;
 use std::fs::File;
@@ -177,6 +178,50 @@ impl TextOutput for SplitSummary {
         writeln!(out, "Supernet:           {}", self.supernet).unwrap();
         writeln!(out, "New Prefix:         /{}", self.new_prefix).unwrap();
         writeln!(out, "Available Subnets:  {}", self.available_subnets).unwrap();
+        out
+    }
+}
+
+impl TextOutput for Ipv4SummaryResult {
+    fn to_text(&self) -> String {
+        let mut out = String::new();
+        writeln!(out, "CIDR Summarization").unwrap();
+        writeln!(out, "==================").unwrap();
+        writeln!(out, "Input CIDRs:   {}", self.input_count).unwrap();
+        writeln!(out, "Output CIDRs:  {}", self.output_count).unwrap();
+        writeln!(out).unwrap();
+        for (i, cidr) in self.cidrs.iter().enumerate() {
+            writeln!(
+                out,
+                "  {}. {}/{}",
+                i + 1,
+                cidr.network_address,
+                cidr.prefix_length
+            )
+            .unwrap();
+        }
+        out
+    }
+}
+
+impl TextOutput for Ipv6SummaryResult {
+    fn to_text(&self) -> String {
+        let mut out = String::new();
+        writeln!(out, "CIDR Summarization").unwrap();
+        writeln!(out, "==================").unwrap();
+        writeln!(out, "Input CIDRs:   {}", self.input_count).unwrap();
+        writeln!(out, "Output CIDRs:  {}", self.output_count).unwrap();
+        writeln!(out).unwrap();
+        for (i, cidr) in self.cidrs.iter().enumerate() {
+            writeln!(
+                out,
+                "  {}. {}/{}",
+                i + 1,
+                cidr.network_address,
+                cidr.prefix_length
+            )
+            .unwrap();
+        }
         out
     }
 }

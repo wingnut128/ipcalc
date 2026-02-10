@@ -72,6 +72,13 @@ pub enum Commands {
         address: String,
     },
 
+    /// Summarize/aggregate CIDRs into the minimal covering set
+    Summarize {
+        /// CIDR ranges to summarize
+        #[arg(required = true, num_args = 1..)]
+        cidrs: Vec<String>,
+    },
+
     /// Start the HTTP API server
     Serve {
         /// Address to bind to

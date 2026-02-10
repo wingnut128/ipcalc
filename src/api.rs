@@ -21,6 +21,9 @@ use crate::ipv6::Ipv6Subnet;
 #[cfg(feature = "swagger")]
 use crate::subnet_generator::{Ipv4SubnetList, Ipv6SubnetList, SplitSummary};
 use crate::subnet_generator::{count_subnets, generate_ipv4_subnets, generate_ipv6_subnets};
+#[cfg(feature = "swagger")]
+use crate::summarize::{Ipv4SummaryResult, Ipv6SummaryResult};
+use crate::summarize::{summarize_ipv4, summarize_ipv6};
 
 #[cfg(feature = "swagger")]
 #[derive(OpenApi)]
@@ -34,9 +37,11 @@ use crate::subnet_generator::{count_subnets, generate_ipv4_subnets, generate_ipv
         split_ipv6,
         contains_ipv4,
         contains_ipv6,
+        summarize_ipv4_handler,
+        summarize_ipv6_handler,
     ),
     components(
-        schemas(Ipv4Subnet, Ipv6Subnet, Ipv4SubnetList, Ipv6SubnetList, SplitSummary, ContainsResult, SubnetQuery, SplitQuery, ContainsQuery, ErrorResponse, VersionResponse)
+        schemas(Ipv4Subnet, Ipv6Subnet, Ipv4SubnetList, Ipv6SubnetList, SplitSummary, ContainsResult, Ipv4SummaryResult, Ipv6SummaryResult, SubnetQuery, SplitQuery, ContainsQuery, SummarizeQuery, ErrorResponse, VersionResponse)
     ),
     tags(
         (name = "ipcalc", description = "IP subnet calculator API")
@@ -91,6 +96,16 @@ pub struct ContainsQuery {
     pretty: bool,
 }
 
+#[derive(Deserialize)]
+#[cfg_attr(feature = "swagger", derive(ToSchema, IntoParams))]
+pub struct SummarizeQuery {
+    /// Comma-separated CIDR ranges to summarize
+    cidrs: String,
+    /// Pretty print JSON output
+    #[serde(default)]
+    pretty: bool,
+}
+
 #[derive(Serialize)]
 #[cfg_attr(feature = "swagger", derive(ToSchema))]
 struct ErrorResponse {
@@ -116,7 +131,9 @@ pub fn create_router() -> Router {
         .route("/v4/split", get(split_ipv4))
         .route("/v6/split", get(split_ipv6))
         .route("/v4/contains", get(contains_ipv4))
-        .route("/v6/contains", get(contains_ipv6));
+        .route("/v6/contains", get(contains_ipv6))
+        .route("/v4/summarize", get(summarize_ipv4_handler))
+        .route("/v6/summarize", get(summarize_ipv6_handler));
 
     #[cfg(feature = "swagger")]
     let router = router
@@ -444,6 +461,94 @@ async fn contains_ipv6(Query(params): Query<ContainsQuery>) -> impl IntoResponse
         }
         Err(e) => {
             warn!(error = %e, "IPv6 containment check failed");
+            json_response(
+                ErrorResponse {
+                    error: e.to_string(),
+                },
+                params.pretty,
+                StatusCode::BAD_REQUEST,
+            )
+        }
+    }
+}
+
+#[cfg_attr(feature = "swagger", utoipa::path(
+    get,
+    path = "/v4/summarize",
+    params(
+        SummarizeQuery
+    ),
+    responses(
+        (status = 200, description = "Summarized IPv4 CIDRs", body = Ipv4SummaryResult),
+        (status = 400, description = "Invalid parameters", body = ErrorResponse)
+    ),
+    tag = "ipcalc"
+))]
+#[instrument(skip_all, fields(cidrs = %params.cidrs))]
+async fn summarize_ipv4_handler(Query(params): Query<SummarizeQuery>) -> impl IntoResponse {
+    info!("Summarizing IPv4 CIDRs");
+    let cidrs: Vec<String> = params
+        .cidrs
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    match summarize_ipv4(&cidrs) {
+        Ok(result) => {
+            info!(
+                input = result.input_count,
+                output = result.output_count,
+                "IPv4 summarization successful"
+            );
+            json_response(result, params.pretty, StatusCode::OK)
+        }
+        Err(e) => {
+            warn!(error = %e, "IPv4 summarization failed");
+            json_response(
+                ErrorResponse {
+                    error: e.to_string(),
+                },
+                params.pretty,
+                StatusCode::BAD_REQUEST,
+            )
+        }
+    }
+}
+
+#[cfg_attr(feature = "swagger", utoipa::path(
+    get,
+    path = "/v6/summarize",
+    params(
+        SummarizeQuery
+    ),
+    responses(
+        (status = 200, description = "Summarized IPv6 CIDRs", body = Ipv6SummaryResult),
+        (status = 400, description = "Invalid parameters", body = ErrorResponse)
+    ),
+    tag = "ipcalc"
+))]
+#[instrument(skip_all, fields(cidrs = %params.cidrs))]
+async fn summarize_ipv6_handler(Query(params): Query<SummarizeQuery>) -> impl IntoResponse {
+    info!("Summarizing IPv6 CIDRs");
+    let cidrs: Vec<String> = params
+        .cidrs
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    match summarize_ipv6(&cidrs) {
+        Ok(result) => {
+            info!(
+                input = result.input_count,
+                output = result.output_count,
+                "IPv6 summarization successful"
+            );
+            json_response(result, params.pretty, StatusCode::OK)
+        }
+        Err(e) => {
+            warn!(error = %e, "IPv6 summarization failed");
             json_response(
                 ErrorResponse {
                     error: e.to_string(),

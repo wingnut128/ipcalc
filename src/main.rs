@@ -7,6 +7,7 @@ use ipcalc::ipv6::Ipv6Subnet;
 use ipcalc::logging::{LogConfig, init_logging, parse_log_level};
 use ipcalc::output::{OutputFormat, OutputWriter};
 use ipcalc::subnet_generator::{count_subnets, generate_ipv4_subnets, generate_ipv6_subnets};
+use ipcalc::summarize::{summarize_ipv4, summarize_ipv6};
 use std::io::{self, Write};
 use std::net::SocketAddr;
 use tracing::info;
@@ -194,6 +195,26 @@ async fn main() {
                 }
             }
         }
+        Some(Commands::Summarize { cidrs }) => {
+            let is_ipv6 = cidrs.iter().any(|c| c.contains(':'));
+            let result = if is_ipv6 {
+                summarize_ipv6(&cidrs).map(|r| writer.write(&r).expect("Failed to write output"))
+            } else {
+                summarize_ipv4(&cidrs).map(|r| writer.write(&r).expect("Failed to write output"))
+            };
+
+            match result {
+                Ok(output) => {
+                    if cli.output.is_none() {
+                        print_stdout(&output);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
         Some(Commands::Serve {
             address,
             port,
@@ -238,6 +259,8 @@ async fn main() {
             println!("  GET /v6/split?cidr=<cidr>&prefix=<n>&count=<n> - Split IPv6 supernet");
             println!("  GET /v4/contains?cidr=<cidr>&address=<ip>     - Check IPv4 containment");
             println!("  GET /v6/contains?cidr=<cidr>&address=<ip>     - Check IPv6 containment");
+            println!("  GET /v4/summarize?cidrs=<cidr,cidr,...>       - Summarize IPv4 CIDRs");
+            println!("  GET /v6/summarize?cidrs=<cidr,cidr,...>       - Summarize IPv6 CIDRs");
             #[cfg(feature = "swagger")]
             {
                 println!("  GET /swagger-ui          - Interactive API documentation");

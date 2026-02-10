@@ -39,6 +39,9 @@ pub enum IpCalcError {
 
     #[error("JSON serialization error: {0}")]
     Json(#[from] serde_json::Error),
+
+    #[error("No CIDRs provided for summarization")]
+    EmptyCidrList,
 }
 
 pub type Result<T> = std::result::Result<T, IpCalcError>;
