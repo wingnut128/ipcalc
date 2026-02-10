@@ -22,6 +22,7 @@ fn test_ipv4_json_output() {
     assert_eq!(json["broadcast_address"], "192.168.1.255");
     assert_eq!(json["prefix_length"], 24);
     assert_eq!(json["usable_hosts"], 254);
+    assert_eq!(json["address_type"], "Private (RFC 1918)");
 }
 
 #[test]
@@ -31,6 +32,7 @@ fn test_ipv4_text_output() {
     assert!(stdout.contains("IPv4 Subnet Calculator"));
     assert!(stdout.contains("Network Address:   10.0.0.0"));
     assert!(stdout.contains("Broadcast Address: 10.255.255.255"));
+    assert!(stdout.contains("Address Type:      Private (RFC 1918)"));
 }
 
 #[test]
@@ -41,7 +43,7 @@ fn test_ipv6_json_output() {
     let json: serde_json::Value = serde_json::from_str(&stdout).expect("Invalid JSON");
     assert_eq!(json["network_address"], "2001:db8::");
     assert_eq!(json["prefix_length"], 32);
-    assert_eq!(json["address_type"], "Global Unicast");
+    assert_eq!(json["address_type"], "Documentation (RFC 3849)");
 }
 
 #[test]
@@ -49,7 +51,7 @@ fn test_ipv6_text_output() {
     let (stdout, _, success) = run_ipcalc(&["v6", "fe80::1/64", "--format", "text"]);
     assert!(success);
     assert!(stdout.contains("IPv6 Subnet Calculator"));
-    assert!(stdout.contains("Link-Local Unicast"));
+    assert!(stdout.contains("Link-Local Unicast (RFC 4291)"));
 }
 
 #[test]
@@ -161,7 +163,7 @@ fn test_direct_ipv6() {
     let json: serde_json::Value = serde_json::from_str(&stdout).expect("Invalid JSON");
     assert_eq!(json["network_address"], "2001:db8::");
     assert_eq!(json["prefix_length"], 32);
-    assert_eq!(json["address_type"], "Global Unicast");
+    assert_eq!(json["address_type"], "Documentation (RFC 3849)");
 }
 
 #[test]
