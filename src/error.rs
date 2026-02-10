@@ -32,6 +32,11 @@ pub enum IpCalcError {
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
+    #[error(
+        "Generating {count} subnets exceeds the limit of {limit}. Use --count-only to see the count, or -n to generate a smaller number."
+    )]
+    SubnetLimitExceeded { count: String, limit: u64 },
+
     #[error("JSON serialization error: {0}")]
     Json(#[from] serde_json::Error),
 }

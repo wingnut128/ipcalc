@@ -19,8 +19,8 @@ use crate::contains::{check_ipv4_contains, check_ipv6_contains};
 use crate::ipv4::Ipv4Subnet;
 use crate::ipv6::Ipv6Subnet;
 #[cfg(feature = "swagger")]
-use crate::subnet_generator::{Ipv4SubnetList, Ipv6SubnetList};
-use crate::subnet_generator::{generate_ipv4_subnets, generate_ipv6_subnets};
+use crate::subnet_generator::{Ipv4SubnetList, Ipv6SubnetList, SplitSummary};
+use crate::subnet_generator::{count_subnets, generate_ipv4_subnets, generate_ipv6_subnets};
 
 #[cfg(feature = "swagger")]
 #[derive(OpenApi)]
@@ -36,7 +36,7 @@ use crate::subnet_generator::{generate_ipv4_subnets, generate_ipv6_subnets};
         contains_ipv6,
     ),
     components(
-        schemas(Ipv4Subnet, Ipv6Subnet, Ipv4SubnetList, Ipv6SubnetList, ContainsResult, SubnetQuery, SplitQuery, ContainsQuery, ErrorResponse, VersionResponse)
+        schemas(Ipv4Subnet, Ipv6Subnet, Ipv4SubnetList, Ipv6SubnetList, SplitSummary, ContainsResult, SubnetQuery, SplitQuery, ContainsQuery, ErrorResponse, VersionResponse)
     ),
     tags(
         (name = "ipcalc", description = "IP subnet calculator API")
@@ -71,6 +71,9 @@ pub struct SplitQuery {
     /// Generate maximum number of subnets possible.
     #[serde(default)]
     max: bool,
+    /// Show only the number of available subnets (no generation)
+    #[serde(default)]
+    count_only: bool,
     /// Pretty print JSON output
     #[serde(default)]
     pretty: bool,
@@ -246,6 +249,25 @@ async fn calculate_ipv6(Query(params): Query<SubnetQuery>) -> impl IntoResponse 
 async fn split_ipv4(Query(params): Query<SplitQuery>) -> impl IntoResponse {
     info!("Splitting IPv4 supernet");
 
+    if params.count_only {
+        return match count_subnets(&params.cidr, params.prefix) {
+            Ok(summary) => {
+                info!(available = %summary.available_subnets, "IPv4 count-only successful");
+                json_response(summary, params.pretty, StatusCode::OK)
+            }
+            Err(e) => {
+                warn!(error = %e, "IPv4 count-only failed");
+                json_response(
+                    ErrorResponse {
+                        error: e.to_string(),
+                    },
+                    params.pretty,
+                    StatusCode::BAD_REQUEST,
+                )
+            }
+        };
+    }
+
     // Determine the actual count: None means generate max
     let actual_count = if params.max {
         None
@@ -301,6 +323,25 @@ async fn split_ipv4(Query(params): Query<SplitQuery>) -> impl IntoResponse {
 #[instrument(skip_all, fields(cidr = %params.cidr, prefix = params.prefix, count = ?params.count, max = params.max))]
 async fn split_ipv6(Query(params): Query<SplitQuery>) -> impl IntoResponse {
     info!("Splitting IPv6 supernet");
+
+    if params.count_only {
+        return match count_subnets(&params.cidr, params.prefix) {
+            Ok(summary) => {
+                info!(available = %summary.available_subnets, "IPv6 count-only successful");
+                json_response(summary, params.pretty, StatusCode::OK)
+            }
+            Err(e) => {
+                warn!(error = %e, "IPv6 count-only failed");
+                json_response(
+                    ErrorResponse {
+                        error: e.to_string(),
+                    },
+                    params.pretty,
+                    StatusCode::BAD_REQUEST,
+                )
+            }
+        };
+    }
 
     // Determine the actual count: None means generate max
     let actual_count = if params.max {

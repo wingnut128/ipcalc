@@ -146,6 +146,36 @@ async fn test_v6_contains() {
 
 // ── Pretty Output ───────────────────────────────────────────────────
 
+// ── Split Count Only ────────────────────────────────────────────────
+
+#[tokio::test]
+async fn test_v4_split_count_only() {
+    let (status, body) = get("/v4/split?cidr=192.168.0.0/22&prefix=27&count_only=true").await;
+    assert_eq!(status, 200);
+    let json: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(json["available_subnets"], "32");
+    assert_eq!(json["new_prefix"], 27);
+}
+
+#[tokio::test]
+async fn test_v6_split_count_only() {
+    let (status, body) = get("/v6/split?cidr=2001:db8::/64&prefix=96&count_only=true").await;
+    assert_eq!(status, 200);
+    let json: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(json["available_subnets"], "4294967296");
+    assert_eq!(json["new_prefix"], 96);
+}
+
+#[tokio::test]
+async fn test_v6_split_limit_exceeded() {
+    let (status, body) = get("/v6/split?cidr=2001:db8::/32&prefix=64&max=true").await;
+    assert_eq!(status, 400);
+    let json: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert!(json["error"].as_str().unwrap().contains("limit"));
+}
+
+// ── Pretty Output ───────────────────────────────────────────────────
+
 #[tokio::test]
 async fn test_pretty_output() {
     let (status, body) = get("/v4?cidr=192.168.1.0/24&pretty=true").await;

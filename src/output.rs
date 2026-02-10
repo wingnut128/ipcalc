@@ -2,7 +2,7 @@ use crate::contains::ContainsResult;
 use crate::error::Result;
 use crate::ipv4::Ipv4Subnet;
 use crate::ipv6::Ipv6Subnet;
-use crate::subnet_generator::{Ipv4SubnetList, Ipv6SubnetList};
+use crate::subnet_generator::{Ipv4SubnetList, Ipv6SubnetList, SplitSummary};
 use serde::Serialize;
 use std::fmt::Write as FmtWrite;
 use std::fs::File;
@@ -164,6 +164,18 @@ impl TextOutput for Ipv6SubnetList {
             )
             .unwrap();
         }
+        out
+    }
+}
+
+impl TextOutput for SplitSummary {
+    fn to_text(&self) -> String {
+        let mut out = String::new();
+        writeln!(out, "Subnet Split Summary").unwrap();
+        writeln!(out, "====================").unwrap();
+        writeln!(out, "Supernet:           {}", self.supernet).unwrap();
+        writeln!(out, "New Prefix:         /{}", self.new_prefix).unwrap();
+        writeln!(out, "Available Subnets:  {}", self.available_subnets).unwrap();
         out
     }
 }

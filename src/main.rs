@@ -6,7 +6,7 @@ use ipcalc::ipv4::Ipv4Subnet;
 use ipcalc::ipv6::Ipv6Subnet;
 use ipcalc::logging::{LogConfig, init_logging, parse_log_level};
 use ipcalc::output::{OutputFormat, OutputWriter};
-use ipcalc::subnet_generator::{generate_ipv4_subnets, generate_ipv6_subnets};
+use ipcalc::subnet_generator::{count_subnets, generate_ipv4_subnets, generate_ipv6_subnets};
 use std::io::{self, Write};
 use std::net::SocketAddr;
 use tracing::info;
@@ -109,7 +109,24 @@ async fn main() {
             prefix,
             count,
             max,
+            count_only,
         }) => {
+            if count_only {
+                match count_subnets(&cidr, prefix) {
+                    Ok(summary) => {
+                        let output = writer.write(&summary).expect("Failed to write output");
+                        if cli.output.is_none() {
+                            print_stdout(&output);
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Error: {}", e);
+                        std::process::exit(1);
+                    }
+                }
+                return;
+            }
+
             // Detect IPv4 vs IPv6 based on CIDR format
             let is_ipv6 = cidr.contains(':');
 
