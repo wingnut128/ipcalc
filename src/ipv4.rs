@@ -18,6 +18,7 @@ pub struct Ipv4Subnet {
     pub usable_hosts: u64,
     pub network_class: String,
     pub is_private: bool,
+    pub address_type: String,
 }
 
 impl Ipv4Subnet {
@@ -90,6 +91,8 @@ impl Ipv4Subnet {
             || addr.is_loopback()
             || addr.is_link_local();
 
+        let address_type = Self::determine_address_type(network);
+
         Ok(Self {
             input: format!("{}/{}", addr, prefix),
             network_address: network_addr.to_string(),
@@ -103,11 +106,65 @@ impl Ipv4Subnet {
             usable_hosts,
             network_class,
             is_private,
+            address_type,
         })
     }
 
     pub fn network_addr(&self) -> Ipv4Addr {
         Ipv4Addr::from_str(&self.network_address).unwrap()
+    }
+
+    fn determine_address_type(network: u32) -> String {
+        // Check more-specific ranges before less-specific ones
+        let label = if network & 0xff00_0000 == 0x0000_0000 {
+            // 0.0.0.0/8
+            "Current Network (RFC 1122)"
+        } else if network & 0xff00_0000 == 0x0a00_0000 {
+            // 10.0.0.0/8
+            "Private (RFC 1918)"
+        } else if network & 0xffc0_0000 == 0x6440_0000 {
+            // 100.64.0.0/10
+            "Carrier-Grade NAT (RFC 6598)"
+        } else if network & 0xff00_0000 == 0x7f00_0000 {
+            // 127.0.0.0/8
+            "Loopback (RFC 1122)"
+        } else if network & 0xffff_0000 == 0xa9fe_0000 {
+            // 169.254.0.0/16
+            "Link-Local (RFC 3927)"
+        } else if network & 0xfff0_0000 == 0xac10_0000 {
+            // 172.16.0.0/12
+            "Private (RFC 1918)"
+        } else if network & 0xffff_ff00 == 0xc000_0200 {
+            // 192.0.2.0/24 — check before 192.0.0.0/24
+            "Documentation TEST-NET-1 (RFC 5737)"
+        } else if network & 0xffff_ff00 == 0xc000_0000 {
+            // 192.0.0.0/24
+            "IETF Protocol Assignments (RFC 6890)"
+        } else if network & 0xffff_ff00 == 0xc058_6300 {
+            // 192.88.99.0/24
+            "6to4 Relay Anycast (RFC 7526)"
+        } else if network & 0xffff_0000 == 0xc0a8_0000 {
+            // 192.168.0.0/16
+            "Private (RFC 1918)"
+        } else if network & 0xfffe_0000 == 0xc612_0000 {
+            // 198.18.0.0/15
+            "Benchmarking (RFC 2544)"
+        } else if network & 0xffff_ff00 == 0xc633_6400 {
+            // 198.51.100.0/24
+            "Documentation TEST-NET-2 (RFC 5737)"
+        } else if network & 0xffff_ff00 == 0xcb00_7100 {
+            // 203.0.113.0/24
+            "Documentation TEST-NET-3 (RFC 5737)"
+        } else if network & 0xf000_0000 == 0xe000_0000 {
+            // 224.0.0.0/4
+            "Multicast (RFC 5771)"
+        } else if network & 0xf000_0000 == 0xf000_0000 {
+            // 240.0.0.0/4
+            "Reserved (RFC 1112)"
+        } else {
+            "Public"
+        };
+        label.to_string()
     }
 }
 
@@ -159,5 +216,37 @@ mod tests {
     fn test_invalid_prefix() {
         let result = Ipv4Subnet::from_cidr("192.168.1.0/33");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_address_type_rfc_ranges() {
+        let cases = vec![
+            ("0.0.0.0/8", "Current Network (RFC 1122)"),
+            ("10.0.0.0/8", "Private (RFC 1918)"),
+            ("100.64.0.0/10", "Carrier-Grade NAT (RFC 6598)"),
+            ("127.0.0.0/8", "Loopback (RFC 1122)"),
+            ("169.254.0.0/16", "Link-Local (RFC 3927)"),
+            ("172.16.0.0/12", "Private (RFC 1918)"),
+            ("192.0.0.0/24", "IETF Protocol Assignments (RFC 6890)"),
+            ("192.0.2.0/24", "Documentation TEST-NET-1 (RFC 5737)"),
+            ("192.88.99.0/24", "6to4 Relay Anycast (RFC 7526)"),
+            ("192.168.0.0/16", "Private (RFC 1918)"),
+            ("198.18.0.0/15", "Benchmarking (RFC 2544)"),
+            ("198.51.100.0/24", "Documentation TEST-NET-2 (RFC 5737)"),
+            ("203.0.113.0/24", "Documentation TEST-NET-3 (RFC 5737)"),
+            ("224.0.0.0/4", "Multicast (RFC 5771)"),
+            ("240.0.0.0/4", "Reserved (RFC 1112)"),
+            ("8.8.8.0/24", "Public"),
+            ("1.1.1.0/24", "Public"),
+        ];
+
+        for (cidr, expected) in cases {
+            let subnet = Ipv4Subnet::from_cidr(cidr).unwrap();
+            assert_eq!(
+                subnet.address_type, expected,
+                "Failed for {}: got '{}', expected '{}'",
+                cidr, subnet.address_type, expected
+            );
+        }
     }
 }

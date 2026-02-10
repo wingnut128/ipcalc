@@ -91,20 +91,27 @@ impl Ipv6Subnet {
 
     fn determine_address_type(addr: &Ipv6Addr) -> String {
         if addr.is_loopback() {
-            "Loopback".to_string()
+            "Loopback (RFC 4291)".to_string()
         } else if addr.is_unspecified() {
-            "Unspecified".to_string()
+            "Unspecified (RFC 4291)".to_string()
         } else if addr.is_multicast() {
-            "Multicast".to_string()
+            "Multicast (RFC 4291)".to_string()
         } else if Self::is_link_local(addr) {
-            "Link-Local Unicast".to_string()
+            "Link-Local Unicast (RFC 4291)".to_string()
         } else if Self::is_unique_local(addr) {
-            "Unique Local Address (ULA)".to_string()
+            "Unique Local Address (RFC 4193)".to_string()
+        } else if Self::is_documentation(addr) {
+            "Documentation (RFC 3849)".to_string()
         } else if Self::is_global_unicast(addr) {
-            "Global Unicast".to_string()
+            "Global Unicast (RFC 4291)".to_string()
         } else {
             "Other".to_string()
         }
+    }
+
+    fn is_documentation(addr: &Ipv6Addr) -> bool {
+        let segments = addr.segments();
+        segments[0] == 0x2001 && segments[1] == 0x0db8
     }
 
     fn is_link_local(addr: &Ipv6Addr) -> bool {
@@ -140,7 +147,7 @@ mod tests {
             "2001:0db8:85a3:0000:0000:0000:0000:0000"
         );
         assert_eq!(subnet.prefix_length, 64);
-        assert_eq!(subnet.address_type, "Global Unicast");
+        assert_eq!(subnet.address_type, "Documentation (RFC 3849)");
     }
 
     #[test]
@@ -148,19 +155,31 @@ mod tests {
         let subnet = Ipv6Subnet::from_cidr("::1/128").unwrap();
         assert_eq!(subnet.network_address, "::1");
         assert_eq!(subnet.total_addresses, "1");
-        assert_eq!(subnet.address_type, "Loopback");
+        assert_eq!(subnet.address_type, "Loopback (RFC 4291)");
     }
 
     #[test]
     fn test_ipv6_link_local() {
         let subnet = Ipv6Subnet::from_cidr("fe80::1/10").unwrap();
-        assert_eq!(subnet.address_type, "Link-Local Unicast");
+        assert_eq!(subnet.address_type, "Link-Local Unicast (RFC 4291)");
     }
 
     #[test]
     fn test_ipv6_ula() {
         let subnet = Ipv6Subnet::from_cidr("fd00::1/8").unwrap();
-        assert_eq!(subnet.address_type, "Unique Local Address (ULA)");
+        assert_eq!(subnet.address_type, "Unique Local Address (RFC 4193)");
+    }
+
+    #[test]
+    fn test_ipv6_documentation() {
+        let subnet = Ipv6Subnet::from_cidr("2001:db8::/32").unwrap();
+        assert_eq!(subnet.address_type, "Documentation (RFC 3849)");
+    }
+
+    #[test]
+    fn test_ipv6_global_unicast() {
+        let subnet = Ipv6Subnet::from_cidr("2001:4860::/32").unwrap();
+        assert_eq!(subnet.address_type, "Global Unicast (RFC 4291)");
     }
 
     #[test]

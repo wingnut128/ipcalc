@@ -79,6 +79,7 @@ impl TextOutput for Ipv4Subnet {
             if self.is_private { "Yes" } else { "No" }
         )
         .unwrap();
+        writeln!(out, "Address Type:      {}", self.address_type).unwrap();
         out
     }
 }
