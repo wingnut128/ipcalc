@@ -58,6 +58,10 @@ pub enum Commands {
         /// Generate maximum number of subnets possible
         #[arg(short = 'm', long, conflicts_with = "count")]
         max: bool,
+
+        /// Show only the number of available subnets (no generation)
+        #[arg(long, conflicts_with_all = ["count", "max"])]
+        count_only: bool,
     },
 
     /// Check if an IP address is contained in a subnet

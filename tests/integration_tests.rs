@@ -245,3 +245,46 @@ fn test_contains_invalid_address() {
     assert!(!success);
     assert!(stderr.contains("Error"));
 }
+
+#[test]
+fn test_split_count_only_ipv4() {
+    let (stdout, _, success) = run_ipcalc(&["split", "192.168.0.0/22", "-p", "27", "--count-only"]);
+    assert!(success);
+
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("Invalid JSON");
+    assert_eq!(json["available_subnets"], "32");
+    assert_eq!(json["new_prefix"], 27);
+}
+
+#[test]
+fn test_split_count_only_ipv6() {
+    let (stdout, _, success) = run_ipcalc(&["split", "2001:db8::/64", "-p", "96", "--count-only"]);
+    assert!(success);
+
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("Invalid JSON");
+    assert_eq!(json["available_subnets"], "4294967296");
+    assert_eq!(json["new_prefix"], 96);
+}
+
+#[test]
+fn test_split_count_only_ipv6_huge() {
+    let (stdout, _, success) = run_ipcalc(&["split", "2001:db8::/32", "-p", "128", "--count-only"]);
+    assert!(success);
+
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("Invalid JSON");
+    assert_eq!(json["available_subnets"], "2^96");
+}
+
+#[test]
+fn test_split_limit_exceeded_ipv4() {
+    let (_, stderr, success) = run_ipcalc(&["split", "10.0.0.0/8", "-p", "32", "--max"]);
+    assert!(!success);
+    assert!(stderr.contains("limit"));
+}
+
+#[test]
+fn test_split_limit_exceeded_ipv6() {
+    let (_, stderr, success) = run_ipcalc(&["split", "2001:db8::/32", "-p", "64", "--max"]);
+    assert!(!success);
+    assert!(stderr.contains("limit"));
+}

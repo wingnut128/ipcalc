@@ -4,6 +4,17 @@ use crate::ipv6::Ipv6Subnet;
 use serde::Serialize;
 use std::net::{Ipv4Addr, Ipv6Addr};
 
+/// Maximum number of subnets that can be generated in a single request.
+pub const MAX_GENERATED_SUBNETS: u64 = 1_000_000;
+
+#[derive(Debug, Serialize)]
+#[cfg_attr(feature = "swagger", derive(utoipa::ToSchema))]
+pub struct SplitSummary {
+    pub supernet: String,
+    pub new_prefix: u8,
+    pub available_subnets: String,
+}
+
 #[derive(Debug, Serialize)]
 #[cfg_attr(feature = "swagger", derive(utoipa::ToSchema))]
 pub struct Ipv4SubnetList {
@@ -20,6 +31,54 @@ pub struct Ipv6SubnetList {
     pub new_prefix: u8,
     pub requested_count: u64,
     pub subnets: Vec<Ipv6Subnet>,
+}
+
+/// Count available subnets without generating them.
+/// Auto-detects IPv4 vs IPv6 based on the CIDR notation.
+pub fn count_subnets(cidr: &str, new_prefix: u8) -> Result<SplitSummary> {
+    let is_ipv6 = cidr.contains(':');
+
+    if is_ipv6 {
+        let supernet = Ipv6Subnet::from_cidr(cidr)?;
+        if new_prefix <= supernet.prefix_length {
+            return Err(IpCalcError::InvalidSubnetSplit {
+                new_prefix,
+                original_prefix: supernet.prefix_length,
+            });
+        }
+        if new_prefix > 128 {
+            return Err(IpCalcError::InvalidPrefixLength(new_prefix));
+        }
+        let bits_diff = new_prefix - supernet.prefix_length;
+        let available = if bits_diff > 63 {
+            format!("2^{}", bits_diff)
+        } else {
+            2u64.pow(bits_diff as u32).to_string()
+        };
+        Ok(SplitSummary {
+            supernet: supernet.input,
+            new_prefix,
+            available_subnets: available,
+        })
+    } else {
+        let supernet = Ipv4Subnet::from_cidr(cidr)?;
+        if new_prefix <= supernet.prefix_length {
+            return Err(IpCalcError::InvalidSubnetSplit {
+                new_prefix,
+                original_prefix: supernet.prefix_length,
+            });
+        }
+        if new_prefix > 32 {
+            return Err(IpCalcError::InvalidPrefixLength(new_prefix));
+        }
+        let bits_diff = new_prefix - supernet.prefix_length;
+        let available = 2u64.pow(bits_diff as u32).to_string();
+        Ok(SplitSummary {
+            supernet: supernet.input,
+            new_prefix,
+            available_subnets: available,
+        })
+    }
 }
 
 /// Generate IPv4 subnets from a supernet.
@@ -60,6 +119,13 @@ pub fn generate_ipv4_subnets(
         }
         None => available,
     };
+
+    if actual_count > MAX_GENERATED_SUBNETS {
+        return Err(IpCalcError::SubnetLimitExceeded {
+            count: actual_count.to_string(),
+            limit: MAX_GENERATED_SUBNETS,
+        });
+    }
 
     let network_u32 = u32::from(supernet.network_addr());
     let subnet_size = 2u32.pow((32 - new_prefix) as u32);
@@ -124,6 +190,13 @@ pub fn generate_ipv6_subnets(
         }
         None => available,
     };
+
+    if actual_count > MAX_GENERATED_SUBNETS {
+        return Err(IpCalcError::SubnetLimitExceeded {
+            count: actual_count.to_string(),
+            limit: MAX_GENERATED_SUBNETS,
+        });
+    }
 
     let network_u128 = u128::from(supernet.network_addr());
     let subnet_size: u128 = if new_prefix == 128 {
