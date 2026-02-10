@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-02-10
+
+### Added
+
+- `count-only=true` hyphenated query parameter alias for API split endpoints (web-friendly convention alongside `count_only=true`)
+- TUI count-only mode: press `C` in Split mode to show available subnet count without generating subnets
+- API test for hyphenated `count-only` query parameter
+
 ## [0.5.0] - 2026-02-10
 
 ### Added
@@ -209,7 +217,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dockerfile for containerized deployment
 - Makefile for common development tasks
 
-[Unreleased]: https://github.com/wingnut128/ipcalc/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/wingnut128/ipcalc/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/wingnut128/ipcalc/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/wingnut128/ipcalc/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/wingnut128/ipcalc/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/wingnut128/ipcalc/compare/v0.3.2...v0.4.0
