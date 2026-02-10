@@ -26,6 +26,16 @@ NEVER read, write, edit, list, display, copy, move, or otherwise access the foll
 
 If the user asks you to access any of these, refuse and explain why.
 
+## Workflow
+
+When working on a Linear ticket:
+
+1. Create a GitHub issue that references the Linear ticket
+2. Open a feature branch for the work
+3. Implement, commit, and push the branch
+4. Open a PR — CI tests must pass before merging to main
+5. After merging, clean up the branch (local + remote)
+
 ## Build & Development Commands
 
 ```bash
