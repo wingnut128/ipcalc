@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-02-10
+
+### Added
+
+- `summarize` CLI subcommand to aggregate adjacent/overlapping CIDR ranges into the minimal covering set
+- `GET /v4/summarize` and `GET /v6/summarize` API endpoints with OpenAPI documentation
+- Automatic IPv4/IPv6 detection for summarize command
+- JSON and text output formats for summarization results
+- Unit and integration tests for CIDR summarization
+
 ## [0.6.1] - 2026-02-10
 
 ### Added
@@ -225,7 +235,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dockerfile for containerized deployment
 - Makefile for common development tasks
 
-[Unreleased]: https://github.com/wingnut128/ipcalc/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/wingnut128/ipcalc/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/wingnut128/ipcalc/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/wingnut128/ipcalc/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/wingnut128/ipcalc/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/wingnut128/ipcalc/compare/v0.4.1...v0.5.0
