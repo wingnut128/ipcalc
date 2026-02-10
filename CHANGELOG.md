@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-02-10
+
+### Added
+
+- IPv4 `address_type` field classifying network addresses into 16 RFC-referenced special-use ranges (RFC 1918, RFC 6598, RFC 5737, RFC 1122, RFC 3927, RFC 6890, RFC 7526, RFC 2544, RFC 5771, RFC 1112)
+- IPv6 Documentation range detection for `2001:db8::/32` → `Documentation (RFC 3849)`
+- RFC references added to all IPv6 address type strings (e.g., `Loopback` → `Loopback (RFC 4291)`)
+
 ## [0.6.0] - 2026-02-10
 
 ### Added
@@ -217,7 +225,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dockerfile for containerized deployment
 - Makefile for common development tasks
 
-[Unreleased]: https://github.com/wingnut128/ipcalc/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/wingnut128/ipcalc/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/wingnut128/ipcalc/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/wingnut128/ipcalc/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/wingnut128/ipcalc/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/wingnut128/ipcalc/compare/v0.4.0...v0.4.1
