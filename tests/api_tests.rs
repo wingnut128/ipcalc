@@ -158,6 +158,15 @@ async fn test_v4_split_count_only() {
 }
 
 #[tokio::test]
+async fn test_v4_split_count_only_hyphenated() {
+    let (status, body) = get("/v4/split?cidr=192.168.0.0/22&prefix=27&count-only=true").await;
+    assert_eq!(status, 200);
+    let json: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(json["available_subnets"], "32");
+    assert_eq!(json["new_prefix"], 27);
+}
+
+#[tokio::test]
 async fn test_v6_split_count_only() {
     let (status, body) = get("/v6/split?cidr=2001:db8::/64&prefix=96&count_only=true").await;
     assert_eq!(status, 200);

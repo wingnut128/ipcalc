@@ -10,7 +10,7 @@ use ratatui::{prelude::*, widgets::*};
 use std::io;
 
 #[cfg(feature = "tui")]
-use crate::subnet_generator::{generate_ipv4_subnets, generate_ipv6_subnets};
+use crate::subnet_generator::{count_subnets, generate_ipv4_subnets, generate_ipv6_subnets};
 
 #[cfg(feature = "tui")]
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -35,6 +35,7 @@ struct AppState {
     prefix_input: String,
     count_input: String,
     use_max: bool,
+    count_only: bool,
     scroll_offset: usize,
     error_message: Option<String>,
 }
@@ -49,6 +50,7 @@ impl AppState {
             prefix_input: String::from(""),
             count_input: String::from(""),
             use_max: false,
+            count_only: false,
             scroll_offset: 0,
             error_message: None,
         }
@@ -67,6 +69,7 @@ impl AppState {
         };
         self.scroll_offset = 0;
         self.error_message = None;
+        self.count_only = false;
     }
 
     fn next_field(&mut self) {
@@ -129,6 +132,17 @@ impl AppState {
             self.use_max = !self.use_max;
             if self.use_max {
                 self.count_input.clear();
+                self.count_only = false;
+            }
+        }
+    }
+
+    fn toggle_count_only(&mut self) {
+        if self.mode == Mode::Split && self.active_field == InputField::Count {
+            self.count_only = !self.count_only;
+            if self.count_only {
+                self.count_input.clear();
+                self.use_max = false;
             }
         }
     }
@@ -155,6 +169,7 @@ pub fn run_tui() -> io::Result<()> {
                 KeyCode::Tab => app.toggle_mode(),
                 KeyCode::Enter => app.next_field(),
                 KeyCode::Char('m') | KeyCode::Char('M') => app.toggle_max(),
+                KeyCode::Char('c') | KeyCode::Char('C') => app.toggle_count_only(),
                 KeyCode::Char(c) => app.handle_char_input(c),
                 KeyCode::Backspace => app.handle_backspace(),
                 KeyCode::Up => app.scroll_up(),
@@ -210,7 +225,7 @@ fn ui(f: &mut Frame, app: &AppState) {
     let help_text = match app.mode {
         Mode::Calculate => " ESC: Quit | TAB: Switch Mode | Type to edit CIDR ",
         Mode::Split => {
-            " ESC: Quit | TAB: Switch Mode | ENTER: Next Field | M: Toggle Max | ↑↓: Scroll "
+            " ESC: Quit | TAB: Switch Mode | ENTER: Next Field | M: Max | C: Count Only | ↑↓: Scroll "
         }
     };
     let help = Paragraph::new(help_text).block(Block::default().borders(Borders::ALL));
@@ -268,7 +283,9 @@ fn render_split_inputs(f: &mut Frame, app: &AppState, area: Rect) {
     } else {
         Style::default()
     };
-    let count_text = if app.use_max {
+    let count_text = if app.count_only {
+        " COUNT ONLY ".to_string()
+    } else if app.use_max {
         " MAX ".to_string()
     } else if app.count_input.is_empty() {
         " ".to_string()
@@ -278,7 +295,7 @@ fn render_split_inputs(f: &mut Frame, app: &AppState, area: Rect) {
     let count_panel = Paragraph::new(count_text).style(count_style).block(
         Block::default()
             .borders(Borders::ALL)
-            .title(" Count (or M for MAX) "),
+            .title(" Count (M: Max, C: Count Only) "),
     );
     f.render_widget(count_panel, input_chunks[2]);
 }
@@ -326,8 +343,8 @@ fn render_split_results(f: &mut Frame, app: &AppState, area: Rect) {
         return;
     }
 
-    if app.mode == Mode::Split && !app.use_max && app.count_input.is_empty() {
-        let help_text = "Enter count or press 'M' for maximum subnets";
+    if app.mode == Mode::Split && !app.use_max && !app.count_only && app.count_input.is_empty() {
+        let help_text = "Enter count, press 'M' for max, or 'C' for count only";
         let results = Paragraph::new(help_text)
             .block(
                 Block::default()
@@ -355,6 +372,28 @@ fn render_split_results(f: &mut Frame, app: &AppState, area: Rect) {
             return;
         }
     };
+
+    // Count-only mode: just show the available subnet count
+    if app.count_only {
+        let result_text = match count_subnets(&app.cidr_input, prefix) {
+            Ok(summary) => {
+                format!(
+                    "Supernet: {}\nNew Prefix: /{}\nAvailable Subnets: {}",
+                    summary.supernet, summary.new_prefix, summary.available_subnets
+                )
+            }
+            Err(e) => format!("Error: {}", e),
+        };
+        let results = Paragraph::new(result_text)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(" Split Results (Count Only) "),
+            )
+            .style(Style::default().fg(Color::Green));
+        f.render_widget(results, area);
+        return;
+    }
 
     let count = if app.use_max {
         None

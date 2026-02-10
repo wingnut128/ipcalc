@@ -72,7 +72,7 @@ pub struct SplitQuery {
     #[serde(default)]
     max: bool,
     /// Show only the number of available subnets (no generation)
-    #[serde(default)]
+    #[serde(default, alias = "count-only")]
     count_only: bool,
     /// Pretty print JSON output
     #[serde(default)]
