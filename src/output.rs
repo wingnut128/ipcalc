@@ -1,5 +1,6 @@
 use crate::contains::ContainsResult;
 use crate::error::Result;
+use crate::from_range::{Ipv4FromRangeResult, Ipv6FromRangeResult};
 use crate::ipv4::Ipv4Subnet;
 use crate::ipv6::Ipv6Subnet;
 use crate::subnet_generator::{Ipv4SubnetList, Ipv6SubnetList, SplitSummary};
@@ -211,6 +212,52 @@ impl TextOutput for Ipv6SummaryResult {
         writeln!(out, "==================").unwrap();
         writeln!(out, "Input CIDRs:   {}", self.input_count).unwrap();
         writeln!(out, "Output CIDRs:  {}", self.output_count).unwrap();
+        writeln!(out).unwrap();
+        for (i, cidr) in self.cidrs.iter().enumerate() {
+            writeln!(
+                out,
+                "  {}. {}/{}",
+                i + 1,
+                cidr.network_address,
+                cidr.prefix_length
+            )
+            .unwrap();
+        }
+        out
+    }
+}
+
+impl TextOutput for Ipv4FromRangeResult {
+    fn to_text(&self) -> String {
+        let mut out = String::new();
+        writeln!(out, "IP Range to CIDR").unwrap();
+        writeln!(out, "=================").unwrap();
+        writeln!(out, "Start Address: {}", self.start_address).unwrap();
+        writeln!(out, "End Address:   {}", self.end_address).unwrap();
+        writeln!(out, "CIDR Count:    {}", self.cidr_count).unwrap();
+        writeln!(out).unwrap();
+        for (i, cidr) in self.cidrs.iter().enumerate() {
+            writeln!(
+                out,
+                "  {}. {}/{}",
+                i + 1,
+                cidr.network_address,
+                cidr.prefix_length
+            )
+            .unwrap();
+        }
+        out
+    }
+}
+
+impl TextOutput for Ipv6FromRangeResult {
+    fn to_text(&self) -> String {
+        let mut out = String::new();
+        writeln!(out, "IP Range to CIDR").unwrap();
+        writeln!(out, "=================").unwrap();
+        writeln!(out, "Start Address: {}", self.start_address).unwrap();
+        writeln!(out, "End Address:   {}", self.end_address).unwrap();
+        writeln!(out, "CIDR Count:    {}", self.cidr_count).unwrap();
         writeln!(out).unwrap();
         for (i, cidr) in self.cidrs.iter().enumerate() {
             writeln!(

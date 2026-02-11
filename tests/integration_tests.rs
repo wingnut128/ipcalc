@@ -336,3 +336,67 @@ fn test_summarize_empty() {
     assert!(!success);
     assert!(stderr.contains("required"));
 }
+
+#[test]
+fn test_from_range_ipv4_json() {
+    let (stdout, _, success) = run_ipcalc(&["from-range", "192.168.1.10", "192.168.1.20"]);
+    assert!(success);
+
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("Invalid JSON");
+    assert_eq!(json["start_address"], "192.168.1.10");
+    assert_eq!(json["end_address"], "192.168.1.20");
+    assert!(json["cidr_count"].as_u64().unwrap() > 1);
+    assert!(json["cidrs"].as_array().unwrap().len() > 1);
+    // First CIDR should start at .10
+    assert_eq!(json["cidrs"][0]["network_address"], "192.168.1.10");
+}
+
+#[test]
+fn test_from_range_ipv4_text() {
+    let (stdout, _, success) = run_ipcalc(&[
+        "from-range",
+        "192.168.1.10",
+        "192.168.1.20",
+        "--format",
+        "text",
+    ]);
+    assert!(success);
+    assert!(stdout.contains("IP Range to CIDR"));
+    assert!(stdout.contains("Start Address: 192.168.1.10"));
+    assert!(stdout.contains("End Address:   192.168.1.20"));
+}
+
+#[test]
+fn test_from_range_ipv4_single_address() {
+    let (stdout, _, success) = run_ipcalc(&["from-range", "10.0.0.1", "10.0.0.1"]);
+    assert!(success);
+
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("Invalid JSON");
+    assert_eq!(json["cidr_count"], 1);
+    assert_eq!(json["cidrs"][0]["prefix_length"], 32);
+}
+
+#[test]
+fn test_from_range_ipv6_json() {
+    let (stdout, _, success) = run_ipcalc(&["from-range", "2001:db8::1", "2001:db8::ff"]);
+    assert!(success);
+
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("Invalid JSON");
+    assert_eq!(json["start_address"], "2001:db8::1");
+    assert_eq!(json["end_address"], "2001:db8::ff");
+    assert!(json["cidr_count"].as_u64().unwrap() > 0);
+}
+
+#[test]
+fn test_from_range_invalid_start_gt_end() {
+    let (_, stderr, success) = run_ipcalc(&["from-range", "192.168.1.20", "192.168.1.10"]);
+    assert!(!success);
+    assert!(stderr.contains("Error"));
+}
+
+#[test]
+fn test_from_range_invalid_address() {
+    let (_, stderr, success) = run_ipcalc(&["from-range", "not-an-ip", "192.168.1.10"]);
+    assert!(!success);
+    assert!(stderr.contains("Error"));
+}

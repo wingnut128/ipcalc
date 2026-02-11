@@ -16,6 +16,9 @@ use utoipa_swagger_ui::SwaggerUi;
 #[cfg(feature = "swagger")]
 use crate::contains::ContainsResult;
 use crate::contains::{check_ipv4_contains, check_ipv6_contains};
+#[cfg(feature = "swagger")]
+use crate::from_range::{Ipv4FromRangeResult, Ipv6FromRangeResult};
+use crate::from_range::{from_range_ipv4, from_range_ipv6};
 use crate::ipv4::Ipv4Subnet;
 use crate::ipv6::Ipv6Subnet;
 #[cfg(feature = "swagger")]
@@ -39,9 +42,11 @@ use crate::summarize::{summarize_ipv4, summarize_ipv6};
         contains_ipv6,
         summarize_ipv4_handler,
         summarize_ipv6_handler,
+        from_range_ipv4_handler,
+        from_range_ipv6_handler,
     ),
     components(
-        schemas(Ipv4Subnet, Ipv6Subnet, Ipv4SubnetList, Ipv6SubnetList, SplitSummary, ContainsResult, Ipv4SummaryResult, Ipv6SummaryResult, SubnetQuery, SplitQuery, ContainsQuery, SummarizeQuery, ErrorResponse, VersionResponse)
+        schemas(Ipv4Subnet, Ipv6Subnet, Ipv4SubnetList, Ipv6SubnetList, SplitSummary, ContainsResult, Ipv4SummaryResult, Ipv6SummaryResult, Ipv4FromRangeResult, Ipv6FromRangeResult, SubnetQuery, SplitQuery, ContainsQuery, SummarizeQuery, FromRangeQuery, ErrorResponse, VersionResponse)
     ),
     tags(
         (name = "ipcalc", description = "IP subnet calculator API")
@@ -106,6 +111,18 @@ pub struct SummarizeQuery {
     pretty: bool,
 }
 
+#[derive(Deserialize)]
+#[cfg_attr(feature = "swagger", derive(ToSchema, IntoParams))]
+pub struct FromRangeQuery {
+    /// Start IP address (e.g., 192.168.1.10 or 2001:db8::1)
+    start: String,
+    /// End IP address (e.g., 192.168.1.20 or 2001:db8::ff)
+    end: String,
+    /// Pretty print JSON output
+    #[serde(default)]
+    pretty: bool,
+}
+
 #[derive(Serialize)]
 #[cfg_attr(feature = "swagger", derive(ToSchema))]
 struct ErrorResponse {
@@ -133,7 +150,9 @@ pub fn create_router() -> Router {
         .route("/v4/contains", get(contains_ipv4))
         .route("/v6/contains", get(contains_ipv6))
         .route("/v4/summarize", get(summarize_ipv4_handler))
-        .route("/v6/summarize", get(summarize_ipv6_handler));
+        .route("/v6/summarize", get(summarize_ipv6_handler))
+        .route("/v4/from-range", get(from_range_ipv4_handler))
+        .route("/v6/from-range", get(from_range_ipv6_handler));
 
     #[cfg(feature = "swagger")]
     let router = router
@@ -549,6 +568,72 @@ async fn summarize_ipv6_handler(Query(params): Query<SummarizeQuery>) -> impl In
         }
         Err(e) => {
             warn!(error = %e, "IPv6 summarization failed");
+            json_response(
+                ErrorResponse {
+                    error: e.to_string(),
+                },
+                params.pretty,
+                StatusCode::BAD_REQUEST,
+            )
+        }
+    }
+}
+
+#[cfg_attr(feature = "swagger", utoipa::path(
+    get,
+    path = "/v4/from-range",
+    params(
+        FromRangeQuery
+    ),
+    responses(
+        (status = 200, description = "CIDR blocks covering the IPv4 range", body = Ipv4FromRangeResult),
+        (status = 400, description = "Invalid parameters", body = ErrorResponse)
+    ),
+    tag = "ipcalc"
+))]
+#[instrument(skip_all, fields(start = %params.start, end = %params.end))]
+async fn from_range_ipv4_handler(Query(params): Query<FromRangeQuery>) -> impl IntoResponse {
+    info!("Converting IPv4 range to CIDRs");
+    match from_range_ipv4(&params.start, &params.end) {
+        Ok(result) => {
+            info!(cidr_count = result.cidr_count, "IPv4 from-range successful");
+            json_response(result, params.pretty, StatusCode::OK)
+        }
+        Err(e) => {
+            warn!(error = %e, "IPv4 from-range failed");
+            json_response(
+                ErrorResponse {
+                    error: e.to_string(),
+                },
+                params.pretty,
+                StatusCode::BAD_REQUEST,
+            )
+        }
+    }
+}
+
+#[cfg_attr(feature = "swagger", utoipa::path(
+    get,
+    path = "/v6/from-range",
+    params(
+        FromRangeQuery
+    ),
+    responses(
+        (status = 200, description = "CIDR blocks covering the IPv6 range", body = Ipv6FromRangeResult),
+        (status = 400, description = "Invalid parameters", body = ErrorResponse)
+    ),
+    tag = "ipcalc"
+))]
+#[instrument(skip_all, fields(start = %params.start, end = %params.end))]
+async fn from_range_ipv6_handler(Query(params): Query<FromRangeQuery>) -> impl IntoResponse {
+    info!("Converting IPv6 range to CIDRs");
+    match from_range_ipv6(&params.start, &params.end) {
+        Ok(result) => {
+            info!(cidr_count = result.cidr_count, "IPv6 from-range successful");
+            json_response(result, params.pretty, StatusCode::OK)
+        }
+        Err(e) => {
+            warn!(error = %e, "IPv6 from-range failed");
             json_response(
                 ErrorResponse {
                     error: e.to_string(),

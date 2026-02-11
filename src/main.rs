@@ -2,6 +2,7 @@ use clap::{CommandFactory, Parser};
 use ipcalc::api::create_router;
 use ipcalc::cli::{Cli, Commands};
 use ipcalc::contains::{check_ipv4_contains, check_ipv6_contains};
+use ipcalc::from_range::{from_range_ipv4, from_range_ipv6};
 use ipcalc::ipv4::Ipv4Subnet;
 use ipcalc::ipv6::Ipv6Subnet;
 use ipcalc::logging::{LogConfig, init_logging, parse_log_level};
@@ -195,6 +196,28 @@ async fn main() {
                 }
             }
         }
+        Some(Commands::FromRange { start, end }) => {
+            let is_ipv6 = start.contains(':');
+            let result = if is_ipv6 {
+                from_range_ipv6(&start, &end)
+                    .map(|r| writer.write(&r).expect("Failed to write output"))
+            } else {
+                from_range_ipv4(&start, &end)
+                    .map(|r| writer.write(&r).expect("Failed to write output"))
+            };
+
+            match result {
+                Ok(output) => {
+                    if cli.output.is_none() {
+                        print_stdout(&output);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
         Some(Commands::Summarize { cidrs }) => {
             let is_ipv6 = cidrs.iter().any(|c| c.contains(':'));
             let result = if is_ipv6 {
@@ -261,6 +284,8 @@ async fn main() {
             println!("  GET /v6/contains?cidr=<cidr>&address=<ip>     - Check IPv6 containment");
             println!("  GET /v4/summarize?cidrs=<cidr,cidr,...>       - Summarize IPv4 CIDRs");
             println!("  GET /v6/summarize?cidrs=<cidr,cidr,...>       - Summarize IPv6 CIDRs");
+            println!("  GET /v4/from-range?start=<ip>&end=<ip>       - IPv4 range to CIDRs");
+            println!("  GET /v6/from-range?start=<ip>&end=<ip>       - IPv6 range to CIDRs");
             #[cfg(feature = "swagger")]
             {
                 println!("  GET /swagger-ui          - Interactive API documentation");
