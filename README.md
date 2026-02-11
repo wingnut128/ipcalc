@@ -12,6 +12,7 @@ A fast IPv4 and IPv6 subnet calculator written in Rust. Available as both a CLI 
 - **IPv6 prefix calculations**: network address, address ranges, hextet breakdown, address type detection (global unicast, link-local, ULA, etc.)
 - **Subnet splitting**: generate N subnets of a given prefix from a supernet, or count available subnets
 - **Subnet summarization**: aggregate multiple CIDRs into the minimal covering set
+- **Range to CIDR**: convert an arbitrary IP range (start–end) into the minimal set of CIDR blocks
 - **Address containment**: check if an IP address belongs to a CIDR range
 - **Interactive TUI**: Terminal user interface with real-time calculations and split mode (optional feature)
 - **Multiple output formats**: JSON (default) or plain text
@@ -109,6 +110,21 @@ ipcalc summarize 2001:db8::/48 2001:db8:1::/48
 ipcalc summarize 10.0.0.0/24 10.0.1.0/24 10.0.2.0/23 --format text
 ```
 
+### Range to CIDR
+
+Convert an arbitrary IP range into the minimal set of CIDR blocks:
+
+```bash
+# IPv4 range
+ipcalc from-range 192.168.1.10 192.168.1.20
+
+# IPv6 range
+ipcalc from-range 2001:db8::1 2001:db8::ff
+
+# Text output
+ipcalc from-range 192.168.1.10 192.168.1.20 --format text
+```
+
 ### Address Containment
 
 Check if an IP address is contained within a subnet:
@@ -190,6 +206,8 @@ ipcalc serve --log-level debug --log-file /var/log/ipcalc.log
 | `GET /v6/contains?cidr=<cidr>&address=<ip>` | Check IPv6 containment | `/v6/contains?cidr=2001:db8::/32&address=2001:db8::1` |
 | `GET /v4/summarize?cidrs=<cidr>,<cidr>` | Summarize IPv4 CIDRs | `/v4/summarize?cidrs=192.168.0.0/24,192.168.1.0/24` |
 | `GET /v6/summarize?cidrs=<cidr>,<cidr>` | Summarize IPv6 CIDRs | `/v6/summarize?cidrs=2001:db8::/48,2001:db8:1::/48` |
+| `GET /v4/from-range?start=<ip>&end=<ip>` | IPv4 range to CIDRs | `/v4/from-range?start=192.168.1.10&end=192.168.1.20` |
+| `GET /v6/from-range?start=<ip>&end=<ip>` | IPv6 range to CIDRs | `/v6/from-range?start=2001:db8::1&end=2001:db8::ff` |
 | `GET /swagger-ui` | Interactive Swagger UI | `/swagger-ui` |
 | `GET /api-docs/openapi.json` | OpenAPI 3.0 specification | `/api-docs/openapi.json` |
 
@@ -213,6 +231,9 @@ curl "http://localhost:8080/v4/split?cidr=10.0.0.0/8&prefix=16&count_only=true"
 
 # Summarize CIDRs
 curl "http://localhost:8080/v4/summarize?cidrs=192.168.0.0/24,192.168.1.0/24"
+
+# Convert IP range to CIDRs
+curl "http://localhost:8080/v4/from-range?start=192.168.1.10&end=192.168.1.20"
 
 # Get OpenAPI specification
 curl "http://localhost:8080/api-docs/openapi.json"
@@ -261,9 +282,10 @@ Arguments:
   [CIDR]  IP address in CIDR notation (e.g., 192.168.1.0/24 or 2001:db8::/48)
 
 Commands:
-  split      Generate subnets from a supernet
-  contains   Check if an IP address is contained in a subnet
-  summarize  Summarize/aggregate CIDRs into the minimal covering set
+  split       Generate subnets from a supernet
+  from-range  Convert an IP range (start–end) into minimal CIDR blocks
+  contains    Check if an IP address is contained in a subnet
+  summarize   Summarize/aggregate CIDRs into the minimal covering set
   serve      Start the HTTP API server
   help       Print help for a command
 
