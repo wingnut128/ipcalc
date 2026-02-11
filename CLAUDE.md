@@ -33,7 +33,7 @@ When working on a Linear ticket:
 1. Create a GitHub issue that references the Linear ticket
 2. Open a feature branch for the work
 3. Implement, commit, and push the branch
-4. Open a PR — CI tests must pass before merging to main
+4. Do NOT create a PR — Linear's GitHub integration creates the PR automatically
 5. After merging, clean up the branch (local + remote)
 
 ## Build & Development Commands
