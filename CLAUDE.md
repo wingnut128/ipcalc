@@ -40,8 +40,9 @@ When working on a Linear ticket:
 
 ```bash
 # Essential commands
-make check          # Run fmt-check, lint, and test (use before commits)
+make check          # Run fmt-check, lint, test, and test-tui (use before commits)
 make test           # Run all tests
+make test-tui       # Run TUI tests (requires tui feature)
 make lint           # Run clippy with -D warnings
 make fmt            # Format code
 
