@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-02-11
+
+### Added
+
+- 29 unit tests for TUI `AppState` methods, gated behind `#[cfg(all(test, feature = "tui"))]`
+- `make test-tui` target and added it to `make check` for CI coverage
+
+### Changed
+
+- Organized `lib.rs` with crate-level documentation and module grouping by domain
+- Removed unused `IpCalcError` re-export from public API
+- Updated CLAUDE.md with `test-tui` build command and workflow instructions
+
+## [0.8.0] - 2026-02-10
+
+### Added
+
+- `from-range` CLI subcommand to convert arbitrary IP address ranges to minimal CIDR notation
+- `GET /v4/from-range` and `GET /v6/from-range` API endpoints with OpenAPI documentation
+- Automatic IPv4/IPv6 detection for range-to-CIDR conversion
+- JSON and text output formats for range conversion results
+- Unit and integration tests for IP range to CIDR conversion
+
 ## [0.7.0] - 2026-02-10
 
 ### Added
@@ -235,7 +258,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dockerfile for containerized deployment
 - Makefile for common development tasks
 
-[Unreleased]: https://github.com/wingnut128/ipcalc/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/wingnut128/ipcalc/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/wingnut128/ipcalc/compare/v0.8.0...v0.8.1
+[0.8.0]: https://github.com/wingnut128/ipcalc/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/wingnut128/ipcalc/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/wingnut128/ipcalc/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/wingnut128/ipcalc/compare/v0.5.0...v0.6.0
