@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Added Rust build caching (`Swatinem/rust-cache@v2`) to CodeQL CI workflow for faster analysis runs
+
 ## [0.8.1] - 2026-02-11
 
 ### Added
