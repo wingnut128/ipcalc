@@ -30,11 +30,12 @@ If the user asks you to access any of these, refuse and explain why.
 
 When working on a Linear ticket:
 
-1. Create a GitHub issue that references the Linear ticket
+1. Create a GitHub issue that references the Linear ticket ID (e.g., "Linear Ticket: BEA-XX") in the issue body
 2. Open a feature branch for the work
 3. Implement, commit, and push the branch
-4. Do NOT create a PR — Linear's GitHub integration creates the PR automatically
-5. After merging, clean up the branch (local + remote)
+4. Update `CHANGELOG.md` with the changes (add to `[Unreleased]` or a new version section as appropriate)
+5. Create a PR — branch protection requires all changes go through a pull request (you cannot push directly to main)
+6. After CI passes, merge the PR and clean up the branch (local + remote, prune stale refs)
 
 ## Build & Development Commands
 
