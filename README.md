@@ -10,7 +10,8 @@ A fast IPv4 and IPv6 subnet calculator written in Rust. Available as both a CLI 
 
 - **IPv4 subnet calculations**: network address, broadcast, subnet mask, wildcard mask, host ranges, network class detection
 - **IPv6 prefix calculations**: network address, address ranges, hextet breakdown, address type detection (global unicast, link-local, ULA, etc.)
-- **Subnet splitting**: generate N subnets of a given prefix from a supernet
+- **Subnet splitting**: generate N subnets of a given prefix from a supernet, or count available subnets
+- **Subnet summarization**: aggregate multiple CIDRs into the minimal covering set
 - **Address containment**: check if an IP address belongs to a CIDR range
 - **Interactive TUI**: Terminal user interface with real-time calculations and split mode (optional feature)
 - **Multiple output formats**: JSON (default) or plain text
@@ -83,8 +84,29 @@ Generate smaller subnets from a larger supernet:
 # Generate 10 /27 subnets from a /22
 ipcalc split 192.168.0.0/22 -p 27 -n 10
 
+# Generate all possible /27 subnets from a /22
+ipcalc split 192.168.0.0/22 -p 27 --max
+
+# Show only how many /27 subnets fit in a /22 (no generation)
+ipcalc split 192.168.0.0/22 -p 27 --count-only
+
 # Generate 5 /48 subnets from a /32
 ipcalc split 2001:db8::/32 -p 48 -n 5
+```
+
+### Subnet Summarization
+
+Aggregate multiple CIDRs into the minimal covering set:
+
+```bash
+# Summarize adjacent IPv4 subnets
+ipcalc summarize 192.168.0.0/24 192.168.1.0/24
+
+# Summarize IPv6 prefixes
+ipcalc summarize 2001:db8::/48 2001:db8:1::/48
+
+# Text output
+ipcalc summarize 10.0.0.0/24 10.0.1.0/24 10.0.2.0/23 --format text
 ```
 
 ### Address Containment
@@ -162,8 +184,12 @@ ipcalc serve --log-level debug --log-file /var/log/ipcalc.log
 | `GET /v6?cidr=<cidr>` | IPv6 calculation | `/v6?cidr=2001:db8::/32` |
 | `GET /v4/split?cidr=<cidr>&prefix=<n>&count=<n>` | Split IPv4 supernet | `/v4/split?cidr=10.0.0.0/8&prefix=16&count=5` |
 | `GET /v6/split?cidr=<cidr>&prefix=<n>&count=<n>` | Split IPv6 supernet | `/v6/split?cidr=2001:db8::/32&prefix=48&count=10` |
+| `GET /v4/split?cidr=<cidr>&prefix=<n>&count_only=true` | Count available IPv4 subnets | `/v4/split?cidr=10.0.0.0/8&prefix=16&count_only=true` |
+| `GET /v6/split?cidr=<cidr>&prefix=<n>&count_only=true` | Count available IPv6 subnets | `/v6/split?cidr=2001:db8::/32&prefix=48&count_only=true` |
 | `GET /v4/contains?cidr=<cidr>&address=<ip>` | Check IPv4 containment | `/v4/contains?cidr=192.168.1.0/24&address=192.168.1.100` |
 | `GET /v6/contains?cidr=<cidr>&address=<ip>` | Check IPv6 containment | `/v6/contains?cidr=2001:db8::/32&address=2001:db8::1` |
+| `GET /v4/summarize?cidrs=<cidr>,<cidr>` | Summarize IPv4 CIDRs | `/v4/summarize?cidrs=192.168.0.0/24,192.168.1.0/24` |
+| `GET /v6/summarize?cidrs=<cidr>,<cidr>` | Summarize IPv6 CIDRs | `/v6/summarize?cidrs=2001:db8::/48,2001:db8:1::/48` |
 | `GET /swagger-ui` | Interactive Swagger UI | `/swagger-ui` |
 | `GET /api-docs/openapi.json` | OpenAPI 3.0 specification | `/api-docs/openapi.json` |
 
@@ -181,6 +207,12 @@ curl "http://localhost:8080/v4/split?cidr=192.168.0.0/22&prefix=27&count=10"
 
 # Check if address is in subnet
 curl "http://localhost:8080/v4/contains?cidr=192.168.1.0/24&address=192.168.1.100"
+
+# Count available subnets without generating them
+curl "http://localhost:8080/v4/split?cidr=10.0.0.0/8&prefix=16&count_only=true"
+
+# Summarize CIDRs
+curl "http://localhost:8080/v4/summarize?cidrs=192.168.0.0/24,192.168.1.0/24"
 
 # Get OpenAPI specification
 curl "http://localhost:8080/api-docs/openapi.json"
@@ -229,10 +261,11 @@ Arguments:
   [CIDR]  IP address in CIDR notation (e.g., 192.168.1.0/24 or 2001:db8::/48)
 
 Commands:
-  split     Generate subnets from a supernet
-  contains  Check if an IP address is contained in a subnet
-  serve     Start the HTTP API server
-  help      Print help for a command
+  split      Generate subnets from a supernet
+  contains   Check if an IP address is contained in a subnet
+  summarize  Summarize/aggregate CIDRs into the minimal covering set
+  serve      Start the HTTP API server
+  help       Print help for a command
 
 Options:
   -f, --format <FORMAT>  Output format [default: json] [possible values: json, text]
