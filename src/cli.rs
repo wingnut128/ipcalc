@@ -72,6 +72,14 @@ pub enum Commands {
         address: String,
     },
 
+    /// Convert an IP range (start–end) into minimal CIDR blocks
+    FromRange {
+        /// Start IP address (e.g., 192.168.1.10 or 2001:db8::1)
+        start: String,
+        /// End IP address (e.g., 192.168.1.20 or 2001:db8::ff)
+        end: String,
+    },
+
     /// Summarize/aggregate CIDRs into the minimal covering set
     Summarize {
         /// CIDR ranges to summarize

@@ -42,6 +42,9 @@ pub enum IpCalcError {
 
     #[error("No CIDRs provided for summarization")]
     EmptyCidrList,
+
+    #[error("Invalid range: start {0} is greater than end {1}")]
+    InvalidRange(String, String),
 }
 
 pub type Result<T> = std::result::Result<T, IpCalcError>;
