@@ -1,4 +1,4 @@
-.PHONY: all build release test lint fmt clean docker docker-run help setup
+.PHONY: all build release test test-tui lint fmt clean docker docker-run help setup
 .PHONY: build-tui release-tui build-no-default release-no-default build-all-features release-all-features
 .PHONY: install install-tui install-all-features uninstall
 
@@ -46,6 +46,10 @@ release-all-features:
 # Run all tests
 test:
 	cargo test
+
+# Run TUI tests (requires tui feature)
+test-tui:
+	cargo test --features tui
 
 # Run tests with output
 test-verbose:
@@ -100,7 +104,7 @@ serve-debug:
 	cargo run -- serve --log-level debug
 
 # Check everything (format, lint, test)
-check: fmt-check lint test
+check: fmt-check lint test test-tui
 
 # CI pipeline target
 ci: check
@@ -133,6 +137,7 @@ help:
 	@echo ""
 	@echo "Test Targets:"
 	@echo "  test                   Run all tests"
+	@echo "  test-tui               Run TUI tests (requires tui feature)"
 	@echo "  test-verbose           Run tests with output"
 	@echo "  lint                   Run clippy linter"
 	@echo "  fmt                    Format code"

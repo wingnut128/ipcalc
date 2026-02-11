@@ -523,3 +523,306 @@ fn render_split_results(f: &mut Frame, app: &AppState, area: Rect) {
         .scroll((0, 0));
     f.render_widget(results, area);
 }
+
+#[cfg(all(test, feature = "tui"))]
+mod tests {
+    use super::*;
+
+    // --- AppState::new() defaults ---
+
+    #[test]
+    fn new_defaults() {
+        let app = AppState::new();
+        assert_eq!(app.mode, Mode::Calculate);
+        assert_eq!(app.active_field, InputField::Cidr);
+        assert_eq!(app.cidr_input, "192.168.1.0/24");
+        assert!(app.prefix_input.is_empty());
+        assert!(app.count_input.is_empty());
+        assert!(!app.use_max);
+        assert!(!app.count_only);
+        assert_eq!(app.scroll_offset, 0);
+        assert!(app.error_message.is_none());
+    }
+
+    // --- toggle_mode ---
+
+    #[test]
+    fn toggle_mode_calculate_to_split() {
+        let mut app = AppState::new();
+        app.toggle_mode();
+        assert_eq!(app.mode, Mode::Split);
+        assert_eq!(app.active_field, InputField::Cidr);
+    }
+
+    #[test]
+    fn toggle_mode_split_to_calculate() {
+        let mut app = AppState::new();
+        app.toggle_mode(); // Calculate -> Split
+        app.toggle_mode(); // Split -> Calculate
+        assert_eq!(app.mode, Mode::Calculate);
+        assert_eq!(app.active_field, InputField::Cidr);
+    }
+
+    #[test]
+    fn toggle_mode_resets_state() {
+        let mut app = AppState::new();
+        app.toggle_mode(); // Split
+        app.active_field = InputField::Count;
+        app.scroll_offset = 5;
+        app.error_message = Some("err".into());
+        app.count_only = true;
+
+        app.toggle_mode(); // Calculate
+        assert_eq!(app.active_field, InputField::Cidr);
+        assert_eq!(app.scroll_offset, 0);
+        assert!(app.error_message.is_none());
+        assert!(!app.count_only);
+    }
+
+    // --- next_field ---
+
+    #[test]
+    fn next_field_cycles_in_split_mode() {
+        let mut app = AppState::new();
+        app.mode = Mode::Split;
+
+        assert_eq!(app.active_field, InputField::Cidr);
+        app.next_field();
+        assert_eq!(app.active_field, InputField::Prefix);
+        app.next_field();
+        assert_eq!(app.active_field, InputField::Count);
+        app.next_field();
+        assert_eq!(app.active_field, InputField::Cidr);
+    }
+
+    #[test]
+    fn next_field_noop_in_calculate_mode() {
+        let mut app = AppState::new();
+        assert_eq!(app.active_field, InputField::Cidr);
+        app.next_field();
+        assert_eq!(app.active_field, InputField::Cidr);
+    }
+
+    // --- handle_char_input ---
+
+    #[test]
+    fn char_input_cidr_accepts_any() {
+        let mut app = AppState::new();
+        app.cidr_input.clear();
+        app.handle_char_input('a');
+        app.handle_char_input('/');
+        app.handle_char_input(':');
+        assert_eq!(app.cidr_input, "a/:");
+    }
+
+    #[test]
+    fn char_input_prefix_only_digits() {
+        let mut app = AppState::new();
+        app.active_field = InputField::Prefix;
+        app.handle_char_input('2');
+        app.handle_char_input('a');
+        app.handle_char_input('4');
+        assert_eq!(app.prefix_input, "24");
+    }
+
+    #[test]
+    fn char_input_count_only_digits() {
+        let mut app = AppState::new();
+        app.active_field = InputField::Count;
+        app.handle_char_input('1');
+        app.handle_char_input('x');
+        app.handle_char_input('0');
+        assert_eq!(app.count_input, "10");
+    }
+
+    #[test]
+    fn char_input_count_clears_use_max() {
+        let mut app = AppState::new();
+        app.active_field = InputField::Count;
+        app.use_max = true;
+        app.handle_char_input('5');
+        assert!(!app.use_max);
+    }
+
+    #[test]
+    fn char_input_clears_error() {
+        let mut app = AppState::new();
+        app.error_message = Some("bad".into());
+        app.handle_char_input('x');
+        assert!(app.error_message.is_none());
+    }
+
+    // --- handle_backspace ---
+
+    #[test]
+    fn backspace_removes_last_char() {
+        let mut app = AppState::new();
+        app.cidr_input = "abc".into();
+        app.handle_backspace();
+        assert_eq!(app.cidr_input, "ab");
+    }
+
+    #[test]
+    fn backspace_on_prefix_field() {
+        let mut app = AppState::new();
+        app.active_field = InputField::Prefix;
+        app.prefix_input = "24".into();
+        app.handle_backspace();
+        assert_eq!(app.prefix_input, "2");
+    }
+
+    #[test]
+    fn backspace_on_count_field() {
+        let mut app = AppState::new();
+        app.active_field = InputField::Count;
+        app.count_input = "10".into();
+        app.handle_backspace();
+        assert_eq!(app.count_input, "1");
+    }
+
+    #[test]
+    fn backspace_on_empty_is_noop() {
+        let mut app = AppState::new();
+        app.cidr_input.clear();
+        app.handle_backspace();
+        assert!(app.cidr_input.is_empty());
+    }
+
+    #[test]
+    fn backspace_clears_error() {
+        let mut app = AppState::new();
+        app.error_message = Some("err".into());
+        app.handle_backspace();
+        assert!(app.error_message.is_none());
+    }
+
+    // --- scroll_up / scroll_down ---
+
+    #[test]
+    fn scroll_up_decrements() {
+        let mut app = AppState::new();
+        app.scroll_offset = 3;
+        app.scroll_up();
+        assert_eq!(app.scroll_offset, 2);
+    }
+
+    #[test]
+    fn scroll_up_floors_at_zero() {
+        let mut app = AppState::new();
+        app.scroll_offset = 0;
+        app.scroll_up();
+        assert_eq!(app.scroll_offset, 0);
+    }
+
+    #[test]
+    fn scroll_down_increments() {
+        let mut app = AppState::new();
+        app.scroll_down(100, 10);
+        assert_eq!(app.scroll_offset, 1);
+    }
+
+    #[test]
+    fn scroll_down_bounded_by_max() {
+        let mut app = AppState::new();
+        app.scroll_offset = 5;
+        // max_items=10, visible=5 -> max scroll_offset = 5
+        app.scroll_down(10, 5);
+        assert_eq!(app.scroll_offset, 5);
+    }
+
+    #[test]
+    fn scroll_down_noop_when_content_fits() {
+        let mut app = AppState::new();
+        // visible_height >= max_items: no scrolling
+        app.scroll_down(5, 10);
+        assert_eq!(app.scroll_offset, 0);
+    }
+
+    // --- toggle_max ---
+
+    #[test]
+    fn toggle_max_in_split_count_field() {
+        let mut app = AppState::new();
+        app.mode = Mode::Split;
+        app.active_field = InputField::Count;
+        app.count_input = "5".into();
+        app.count_only = true;
+
+        app.toggle_max();
+        assert!(app.use_max);
+        assert!(app.count_input.is_empty());
+        assert!(!app.count_only);
+    }
+
+    #[test]
+    fn toggle_max_off() {
+        let mut app = AppState::new();
+        app.mode = Mode::Split;
+        app.active_field = InputField::Count;
+        app.use_max = true;
+
+        app.toggle_max();
+        assert!(!app.use_max);
+    }
+
+    #[test]
+    fn toggle_max_noop_in_calculate_mode() {
+        let mut app = AppState::new();
+        app.active_field = InputField::Count;
+        app.toggle_max();
+        assert!(!app.use_max);
+    }
+
+    #[test]
+    fn toggle_max_noop_on_cidr_field() {
+        let mut app = AppState::new();
+        app.mode = Mode::Split;
+        app.active_field = InputField::Cidr;
+        app.toggle_max();
+        assert!(!app.use_max);
+    }
+
+    // --- toggle_count_only ---
+
+    #[test]
+    fn toggle_count_only_in_split_count_field() {
+        let mut app = AppState::new();
+        app.mode = Mode::Split;
+        app.active_field = InputField::Count;
+        app.count_input = "5".into();
+        app.use_max = true;
+
+        app.toggle_count_only();
+        assert!(app.count_only);
+        assert!(app.count_input.is_empty());
+        assert!(!app.use_max);
+    }
+
+    #[test]
+    fn toggle_count_only_off() {
+        let mut app = AppState::new();
+        app.mode = Mode::Split;
+        app.active_field = InputField::Count;
+        app.count_only = true;
+
+        app.toggle_count_only();
+        assert!(!app.count_only);
+    }
+
+    #[test]
+    fn toggle_count_only_noop_in_calculate_mode() {
+        let mut app = AppState::new();
+        app.active_field = InputField::Count;
+        app.toggle_count_only();
+        assert!(!app.count_only);
+    }
+
+    #[test]
+    fn toggle_count_only_noop_on_prefix_field() {
+        let mut app = AppState::new();
+        app.mode = Mode::Split;
+        app.active_field = InputField::Prefix;
+        app.toggle_count_only();
+        assert!(!app.count_only);
+    }
+}
