@@ -58,6 +58,10 @@ cargo test test_name
 # API server
 make serve          # Run on localhost:8080
 make serve-debug    # Run with debug logging
+
+# Fuzz testing (requires: rustup toolchain install nightly && cargo install cargo-fuzz)
+make fuzz                                      # Run fuzz_cidr_parsing for 60s
+make fuzz FUZZ_TARGET=fuzz_contains FUZZ_DURATION=30  # Run specific target
 ```
 
 **Important**: Run `make setup` after cloning to install git hooks that enforce formatting and linting on commits.

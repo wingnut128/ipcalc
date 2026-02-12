@@ -1,0 +1,38 @@
+[package]
+name = "ipcalc-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.ipcalc]
+path = ".."
+default-features = false
+
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "fuzz_cidr_parsing"
+path = "fuzz_targets/fuzz_cidr_parsing.rs"
+doc = false
+
+[[bin]]
+name = "fuzz_contains"
+path = "fuzz_targets/fuzz_contains.rs"
+doc = false
+
+[[bin]]
+name = "fuzz_from_range"
+path = "fuzz_targets/fuzz_from_range.rs"
+doc = false
+
+[[bin]]
+name = "fuzz_subnet_ops"
+path = "fuzz_targets/fuzz_subnet_ops.rs"
+doc = false

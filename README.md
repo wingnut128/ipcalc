@@ -338,6 +338,36 @@ make docker
 
 The `make setup` command installs a pre-commit hook that automatically runs `cargo fmt --check` and `cargo clippy` before each commit.
 
+### Fuzz Testing
+
+Fuzz tests use [`cargo-fuzz`](https://github.com/rust-fuzz/cargo-fuzz) with libFuzzer to verify that all parsing functions return `Result` errors (never panic) on arbitrary input.
+
+**Prerequisites:**
+
+```bash
+rustup toolchain install nightly
+cargo install cargo-fuzz
+```
+
+**Running fuzz tests:**
+
+```bash
+# Run the default target (fuzz_cidr_parsing) for 60 seconds
+make fuzz
+
+# Run a specific target for a custom duration
+make fuzz FUZZ_TARGET=fuzz_contains FUZZ_DURATION=30
+```
+
+**Available targets:**
+
+| Target | What it fuzzes |
+|--------|---------------|
+| `fuzz_cidr_parsing` | `Ipv4Subnet::from_cidr`, `Ipv6Subnet::from_cidr` |
+| `fuzz_contains` | `check_ipv4_contains`, `check_ipv6_contains` |
+| `fuzz_from_range` | `from_range_ipv4`, `from_range_ipv6` |
+| `fuzz_subnet_ops` | `count_subnets`, `generate_ipv4_subnets`, `generate_ipv6_subnets` |
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.
