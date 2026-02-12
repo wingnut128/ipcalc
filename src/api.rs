@@ -3,7 +3,7 @@ use axum::{
     extract::Query,
     http::{StatusCode, header},
     response::{IntoResponse, Json, Response},
-    routing::get,
+    routing::{get, post},
 };
 use serde::{Deserialize, Serialize};
 use tower_http::trace::TraceLayer;
@@ -13,6 +13,9 @@ use utoipa::{IntoParams, OpenApi, ToSchema};
 #[cfg(feature = "swagger")]
 use utoipa_swagger_ui::SwaggerUi;
 
+#[cfg(feature = "swagger")]
+use crate::batch::BatchResult;
+use crate::batch::process_batch;
 #[cfg(feature = "swagger")]
 use crate::contains::ContainsResult;
 use crate::contains::{check_ipv4_contains, check_ipv6_contains};
@@ -44,9 +47,10 @@ use crate::summarize::{summarize_ipv4, summarize_ipv6};
         summarize_ipv6_handler,
         from_range_ipv4_handler,
         from_range_ipv6_handler,
+        batch_handler,
     ),
     components(
-        schemas(Ipv4Subnet, Ipv6Subnet, Ipv4SubnetList, Ipv6SubnetList, SplitSummary, ContainsResult, Ipv4SummaryResult, Ipv6SummaryResult, Ipv4FromRangeResult, Ipv6FromRangeResult, SubnetQuery, SplitQuery, ContainsQuery, SummarizeQuery, FromRangeQuery, ErrorResponse, VersionResponse)
+        schemas(Ipv4Subnet, Ipv6Subnet, Ipv4SubnetList, Ipv6SubnetList, SplitSummary, ContainsResult, Ipv4SummaryResult, Ipv6SummaryResult, Ipv4FromRangeResult, Ipv6FromRangeResult, SubnetQuery, SplitQuery, ContainsQuery, SummarizeQuery, FromRangeQuery, BatchRequest, BatchResult, ErrorResponse, VersionResponse)
     ),
     tags(
         (name = "ipcalc", description = "IP subnet calculator API")
@@ -123,6 +127,16 @@ pub struct FromRangeQuery {
     pretty: bool,
 }
 
+#[derive(Deserialize)]
+#[cfg_attr(feature = "swagger", derive(ToSchema))]
+pub struct BatchRequest {
+    /// List of CIDRs to process (IPv4 and/or IPv6)
+    pub cidrs: Vec<String>,
+    /// Pretty print JSON output
+    #[serde(default)]
+    pub pretty: bool,
+}
+
 #[derive(Serialize)]
 #[cfg_attr(feature = "swagger", derive(ToSchema))]
 struct ErrorResponse {
@@ -152,7 +166,8 @@ pub fn create_router() -> Router {
         .route("/v4/summarize", get(summarize_ipv4_handler))
         .route("/v6/summarize", get(summarize_ipv6_handler))
         .route("/v4/from-range", get(from_range_ipv4_handler))
-        .route("/v6/from-range", get(from_range_ipv6_handler));
+        .route("/v6/from-range", get(from_range_ipv6_handler))
+        .route("/batch", post(batch_handler));
 
     #[cfg(feature = "swagger")]
     let router = router
@@ -634,6 +649,37 @@ async fn from_range_ipv6_handler(Query(params): Query<FromRangeQuery>) -> impl I
         }
         Err(e) => {
             warn!(error = %e, "IPv6 from-range failed");
+            json_response(
+                ErrorResponse {
+                    error: e.to_string(),
+                },
+                params.pretty,
+                StatusCode::BAD_REQUEST,
+            )
+        }
+    }
+}
+
+#[cfg_attr(feature = "swagger", utoipa::path(
+    post,
+    path = "/batch",
+    request_body = BatchRequest,
+    responses(
+        (status = 200, description = "Batch CIDR processing results", body = BatchResult),
+        (status = 400, description = "Invalid request (e.g., empty CIDR list)", body = ErrorResponse)
+    ),
+    tag = "ipcalc"
+))]
+#[instrument(skip_all, fields(count = params.cidrs.len()))]
+async fn batch_handler(Json(params): Json<BatchRequest>) -> impl IntoResponse {
+    info!("Processing batch CIDRs");
+    match process_batch(&params.cidrs) {
+        Ok(result) => {
+            info!(count = result.count, "Batch processing successful");
+            json_response(result, params.pretty, StatusCode::OK)
+        }
+        Err(e) => {
+            warn!(error = %e, "Batch processing failed");
             json_response(
                 ErrorResponse {
                     error: e.to_string(),

@@ -1,5 +1,5 @@
 use axum::body::Body;
-use axum::http::{Request, StatusCode};
+use axum::http::{Request, StatusCode, header};
 use axum::response::Response;
 use http_body_util::BodyExt;
 use ipcalc::api::create_router;
@@ -8,6 +8,20 @@ use tower::ServiceExt;
 async fn get(uri: &str) -> (StatusCode, String) {
     let app = create_router();
     let req = Request::builder().uri(uri).body(Body::empty()).unwrap();
+    let resp: Response = app.oneshot(req).await.unwrap();
+    let status = resp.status();
+    let body = resp.into_body().collect().await.unwrap().to_bytes();
+    (status, String::from_utf8(body.to_vec()).unwrap())
+}
+
+async fn post_json(uri: &str, json_body: &str) -> (StatusCode, String) {
+    let app = create_router();
+    let req = Request::builder()
+        .method("POST")
+        .uri(uri)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(json_body.to_string()))
+        .unwrap();
     let resp: Response = app.oneshot(req).await.unwrap();
     let status = resp.status();
     let body = resp.into_body().collect().await.unwrap().to_bytes();
@@ -188,6 +202,60 @@ async fn test_v6_split_limit_exceeded() {
 #[tokio::test]
 async fn test_pretty_output() {
     let (status, body) = get("/v4?cidr=192.168.1.0/24&pretty=true").await;
+    assert_eq!(status, 200);
+    // Pretty-printed JSON contains newlines and indentation
+    assert!(body.contains('\n'));
+    assert!(body.contains("  "));
+}
+
+// ── Batch ────────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn test_batch_v4() {
+    let (status, body) = post_json("/batch", r#"{"cidrs":["192.168.1.0/24","10.0.0.0/8"]}"#).await;
+    assert_eq!(status, 200);
+    let json: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(json["count"], 2);
+    assert_eq!(json["results"].as_array().unwrap().len(), 2);
+}
+
+#[tokio::test]
+async fn test_batch_mixed() {
+    let (status, body) =
+        post_json("/batch", r#"{"cidrs":["192.168.1.0/24","2001:db8::/32"]}"#).await;
+    assert_eq!(status, 200);
+    let json: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(json["count"], 2);
+    assert_eq!(json["results"][0]["subnet"]["version"], "v4");
+    assert_eq!(json["results"][1]["subnet"]["version"], "v6");
+}
+
+#[tokio::test]
+async fn test_batch_with_invalid() {
+    let (status, body) = post_json(
+        "/batch",
+        r#"{"cidrs":["192.168.1.0/24","invalid","10.0.0.0/8"]}"#,
+    )
+    .await;
+    assert_eq!(status, 200);
+    let json: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(json["count"], 3);
+    assert!(json["results"][0]["subnet"].is_object());
+    assert!(json["results"][1]["error"].is_string());
+    assert!(json["results"][2]["subnet"].is_object());
+}
+
+#[tokio::test]
+async fn test_batch_empty() {
+    let (status, body) = post_json("/batch", r#"{"cidrs":[]}"#).await;
+    assert_eq!(status, 400);
+    let json: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert!(json["error"].is_string());
+}
+
+#[tokio::test]
+async fn test_batch_pretty() {
+    let (status, body) = post_json("/batch", r#"{"cidrs":["192.168.1.0/24"],"pretty":true}"#).await;
     assert_eq!(status, 200);
     // Pretty-printed JSON contains newlines and indentation
     assert!(body.contains('\n'));
