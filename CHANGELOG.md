@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Batch CIDR processing via multiple positional arguments
+- `--stdin` flag for reading CIDRs from standard input
+- `POST /batch` API endpoint with mixed IPv4/IPv6 auto-detection
+- Partial failure tolerance for invalid CIDRs in batch operations
 - Fuzz testing with `cargo-fuzz` and `libfuzzer-sys` for CIDR parsing, address containment, range conversion, and subnet operations
 - `make fuzz` target with configurable `FUZZ_TARGET` and `FUZZ_DURATION`
 

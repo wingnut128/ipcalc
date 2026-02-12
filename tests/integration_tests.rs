@@ -1,4 +1,5 @@
-use std::process::Command;
+use std::io::Write;
+use std::process::{Command, Stdio};
 
 fn run_ipcalc(args: &[&str]) -> (String, String, bool) {
     let output = Command::new("cargo")
@@ -7,6 +8,29 @@ fn run_ipcalc(args: &[&str]) -> (String, String, bool) {
         .output()
         .expect("Failed to run ipcalc");
 
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    (stdout, stderr, output.status.success())
+}
+
+fn run_ipcalc_stdin(args: &[&str], input: &str) -> (String, String, bool) {
+    let mut child = Command::new("cargo")
+        .args(["run", "--quiet", "--"])
+        .args(args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("Failed to spawn ipcalc");
+
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(input.as_bytes())
+        .unwrap();
+
+    let output = child.wait_with_output().expect("Failed to wait for ipcalc");
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
     (stdout, stderr, output.status.success())
@@ -399,4 +423,85 @@ fn test_from_range_invalid_address() {
     let (_, stderr, success) = run_ipcalc(&["from-range", "not-an-ip", "192.168.1.10"]);
     assert!(!success);
     assert!(stderr.contains("Error"));
+}
+
+// ── Batch CIDR Processing ────────────────────────────────────────────
+
+#[test]
+fn test_batch_multiple_cidrs() {
+    let (stdout, _, success) = run_ipcalc(&["192.168.1.0/24", "10.0.0.0/8"]);
+    assert!(success);
+
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("Invalid JSON");
+    assert_eq!(json["count"], 2);
+    assert_eq!(json["results"].as_array().unwrap().len(), 2);
+}
+
+#[test]
+fn test_batch_mixed_v4_v6() {
+    let (stdout, _, success) = run_ipcalc(&["192.168.1.0/24", "2001:db8::/32"]);
+    assert!(success);
+
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("Invalid JSON");
+    assert_eq!(json["count"], 2);
+    assert_eq!(json["results"][0]["subnet"]["version"], "v4");
+    assert_eq!(json["results"][1]["subnet"]["version"], "v6");
+}
+
+#[test]
+fn test_batch_with_invalid_cidr() {
+    let (stdout, _, success) = run_ipcalc(&["192.168.1.0/24", "not-valid", "10.0.0.0/8"]);
+    assert!(success);
+
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("Invalid JSON");
+    assert_eq!(json["count"], 3);
+    // First and third should succeed, second should have error
+    assert!(json["results"][0]["subnet"].is_object());
+    assert!(json["results"][1]["error"].is_string());
+    assert!(json["results"][2]["subnet"].is_object());
+}
+
+#[test]
+fn test_batch_text_output() {
+    let (stdout, _, success) = run_ipcalc(&["192.168.1.0/24", "10.0.0.0/8", "--format", "text"]);
+    assert!(success);
+    assert!(stdout.contains("Batch CIDR Processing"));
+    assert!(stdout.contains("Total CIDRs: 2"));
+    assert!(stdout.contains("[1/2]"));
+    assert!(stdout.contains("[2/2]"));
+}
+
+#[test]
+fn test_single_cidr_not_batched() {
+    let (stdout, _, success) = run_ipcalc(&["192.168.1.0/24"]);
+    assert!(success);
+
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("Invalid JSON");
+    // Single CIDR should produce flat output — no "count" or "results" wrapper
+    assert!(json.get("count").is_none());
+    assert!(json.get("results").is_none());
+    assert_eq!(json["network_address"], "192.168.1.0");
+}
+
+#[test]
+fn test_stdin_batch() {
+    let input = "192.168.1.0/24\n# comment\n\n10.0.0.0/8\n2001:db8::/32\n";
+    let (stdout, _, success) = run_ipcalc_stdin(&["--stdin"], input);
+    assert!(success);
+
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("Invalid JSON");
+    assert_eq!(json["count"], 3);
+    assert_eq!(json["results"].as_array().unwrap().len(), 3);
+}
+
+#[test]
+fn test_stdin_single_cidr() {
+    let input = "192.168.1.0/24\n";
+    let (stdout, _, success) = run_ipcalc_stdin(&["--stdin"], input);
+    assert!(success);
+
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("Invalid JSON");
+    // Single CIDR via stdin should produce flat output
+    assert!(json.get("count").is_none());
+    assert_eq!(json["network_address"], "192.168.1.0");
 }

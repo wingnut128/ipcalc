@@ -1,5 +1,6 @@
 use clap::{CommandFactory, Parser};
 use ipcalc::api::create_router;
+use ipcalc::batch::process_batch;
 use ipcalc::cli::{Cli, Commands};
 use ipcalc::contains::{check_ipv4_contains, check_ipv6_contains};
 use ipcalc::from_range::{from_range_ipv4, from_range_ipv6};
@@ -9,7 +10,7 @@ use ipcalc::logging::{LogConfig, init_logging, parse_log_level};
 use ipcalc::output::{OutputFormat, OutputWriter};
 use ipcalc::subnet_generator::{count_subnets, generate_ipv4_subnets, generate_ipv6_subnets};
 use ipcalc::summarize::{summarize_ipv4, summarize_ipv6};
-use std::io::{self, Write};
+use std::io::{self, BufRead, Write};
 use std::net::SocketAddr;
 use tracing::info;
 
@@ -41,26 +42,58 @@ async fn main() {
     let format: OutputFormat = cli.format.into();
     let writer = OutputWriter::new(format, cli.output.clone());
 
+    // Collect CIDRs from positional args and/or stdin
+    let mut cidrs = cli.cidr;
+    if cli.stdin {
+        let stdin = io::stdin();
+        for line in stdin.lock().lines() {
+            let line = line.expect("Failed to read stdin");
+            let trimmed = line.trim();
+            if trimmed.is_empty() || trimmed.starts_with('#') {
+                continue;
+            }
+            cidrs.push(trimmed.to_string());
+        }
+    }
+
     // Handle direct CIDR input (auto-detect)
-    if let Some(cidr) = cli.cidr {
-        let is_ipv6 = cidr.contains(':');
-        if is_ipv6 {
-            match Ipv6Subnet::from_cidr(&cidr) {
-                Ok(subnet) => {
-                    let output = writer.write(&subnet).expect("Failed to write output");
-                    if cli.output.is_none() {
-                        print_stdout(&output);
+    if !cidrs.is_empty() {
+        if cidrs.len() == 1 {
+            // Single CIDR — preserve flat output for backward compatibility
+            let cidr = &cidrs[0];
+            let is_ipv6 = cidr.contains(':');
+            if is_ipv6 {
+                match Ipv6Subnet::from_cidr(cidr) {
+                    Ok(subnet) => {
+                        let output = writer.write(&subnet).expect("Failed to write output");
+                        if cli.output.is_none() {
+                            print_stdout(&output);
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Error: {}", e);
+                        std::process::exit(1);
                     }
                 }
-                Err(e) => {
-                    eprintln!("Error: {}", e);
-                    std::process::exit(1);
+            } else {
+                match Ipv4Subnet::from_cidr(cidr) {
+                    Ok(subnet) => {
+                        let output = writer.write(&subnet).expect("Failed to write output");
+                        if cli.output.is_none() {
+                            print_stdout(&output);
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Error: {}", e);
+                        std::process::exit(1);
+                    }
                 }
             }
         } else {
-            match Ipv4Subnet::from_cidr(&cidr) {
-                Ok(subnet) => {
-                    let output = writer.write(&subnet).expect("Failed to write output");
+            // Multiple CIDRs — batch mode
+            match process_batch(&cidrs) {
+                Ok(batch_result) => {
+                    let output = writer.write(&batch_result).expect("Failed to write output");
                     if cli.output.is_none() {
                         print_stdout(&output);
                     }
@@ -286,6 +319,7 @@ async fn main() {
             println!("  GET /v6/summarize?cidrs=<cidr,cidr,...>       - Summarize IPv6 CIDRs");
             println!("  GET /v4/from-range?start=<ip>&end=<ip>       - IPv4 range to CIDRs");
             println!("  GET /v6/from-range?start=<ip>&end=<ip>       - IPv6 range to CIDRs");
+            println!("  POST /batch                                  - Batch CIDR processing");
             #[cfg(feature = "swagger")]
             {
                 println!("  GET /swagger-ui          - Interactive API documentation");

@@ -5,6 +5,7 @@
 //! range-to-CIDR conversion, and route summarization.
 
 // Core calculation modules
+pub mod batch;
 pub mod contains;
 pub mod from_range;
 pub mod ipv4;
@@ -25,6 +26,7 @@ pub mod logging;
 pub mod tui;
 
 // Public API re-exports
+pub use batch::{BatchResult, process_batch};
 pub use contains::ContainsResult;
 pub use from_range::{Ipv4FromRangeResult, Ipv6FromRangeResult};
 pub use ipv4::Ipv4Subnet;

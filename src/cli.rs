@@ -5,9 +5,13 @@ use clap::{Parser, Subcommand, ValueEnum};
 #[command(version)]
 #[command(about = "IP subnet calculator for IPv4 and IPv6", long_about = None)]
 pub struct Cli {
-    /// IP address in CIDR notation (e.g., 192.168.1.0/24 or 2001:db8::/48)
+    /// IP address(es) in CIDR notation (e.g., 192.168.1.0/24 or 2001:db8::/48)
     #[arg(value_name = "CIDR")]
-    pub cidr: Option<String>,
+    pub cidr: Vec<String>,
+
+    /// Read CIDRs from standard input (one per line)
+    #[arg(long)]
+    pub stdin: bool,
 
     #[command(subcommand)]
     pub command: Option<Commands>,

@@ -1,3 +1,4 @@
+use crate::batch::{BatchEntryResult, BatchResult, SubnetResult};
 use crate::contains::ContainsResult;
 use crate::error::Result;
 use crate::from_range::{Ipv4FromRangeResult, Ipv6FromRangeResult};
@@ -268,6 +269,32 @@ impl TextOutput for Ipv6FromRangeResult {
                 cidr.prefix_length
             )
             .unwrap();
+        }
+        out
+    }
+}
+
+impl TextOutput for BatchResult {
+    fn to_text(&self) -> String {
+        let mut out = String::new();
+        writeln!(out, "Batch CIDR Processing").unwrap();
+        writeln!(out, "=====================").unwrap();
+        writeln!(out, "Total CIDRs: {}", self.count).unwrap();
+        writeln!(out).unwrap();
+
+        let total = self.count;
+        for (i, entry) in self.results.iter().enumerate() {
+            writeln!(out, "--- [{}/{}] {} ---", i + 1, total, entry.cidr).unwrap();
+            match &entry.result {
+                BatchEntryResult::Ok { subnet } => match subnet.as_ref() {
+                    SubnetResult::V4(s) => out.push_str(&s.to_text()),
+                    SubnetResult::V6(s) => out.push_str(&s.to_text()),
+                },
+                BatchEntryResult::Err { error } => {
+                    writeln!(out, "Error: {}", error).unwrap();
+                    writeln!(out).unwrap();
+                }
+            }
         }
         out
     }
