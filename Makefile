@@ -1,5 +1,6 @@
 .PHONY: all build release test test-tui lint fmt clean docker docker-run help setup
 .PHONY: build-tui release-tui build-no-default release-no-default build-all-features release-all-features
+.PHONY: fuzz
 .PHONY: install install-tui install-all-features uninstall
 
 # Variables
@@ -103,6 +104,13 @@ serve:
 serve-debug:
 	cargo run -- serve --log-level debug
 
+# Run fuzz testing (requires nightly + cargo-fuzz)
+FUZZ_TARGET ?= fuzz_cidr_parsing
+FUZZ_DURATION ?= 60
+
+fuzz:
+	cargo +nightly fuzz run $(FUZZ_TARGET) -- -max_total_time=$(FUZZ_DURATION)
+
 # Check everything (format, lint, test)
 check: fmt-check lint test test-tui
 
@@ -153,6 +161,9 @@ help:
 	@echo "  install-tui            Install binary locally with TUI feature"
 	@echo "  install-all-features   Install binary locally with all features"
 	@echo "  uninstall              Uninstall binary"
+	@echo ""
+	@echo "Fuzz Targets:"
+	@echo "  fuzz                   Run fuzz testing (FUZZ_TARGET=name FUZZ_DURATION=secs)"
 	@echo ""
 	@echo "Development Targets:"
 	@echo "  serve                  Run API server locally"

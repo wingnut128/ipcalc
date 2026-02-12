@@ -8,3 +8,5 @@
 *.log
 SPEC_TEMPLATE.md
 /.claude/
+fuzz/artifacts/
+fuzz/corpus/
