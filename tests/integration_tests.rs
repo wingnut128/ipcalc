@@ -505,3 +505,139 @@ fn test_stdin_single_cidr() {
     assert!(json.get("count").is_none());
     assert_eq!(json["network_address"], "192.168.1.0");
 }
+
+// ── CSV Output ───────────────────────────────────────────────────────
+
+#[test]
+fn test_ipv4_csv_output() {
+    let (stdout, _, success) = run_ipcalc(&["192.168.1.0/24", "--format", "csv"]);
+    assert!(success);
+
+    let lines: Vec<&str> = stdout.lines().collect();
+    assert!(lines.len() >= 2, "CSV should have header + data row");
+    assert!(lines[0].contains("network_address"));
+    assert!(lines[0].contains("prefix_length"));
+    assert!(lines[1].contains("192.168.1.0"));
+    assert!(lines[1].contains("24"));
+}
+
+#[test]
+fn test_ipv6_csv_output() {
+    let (stdout, _, success) = run_ipcalc(&["2001:db8::/32", "--format", "csv"]);
+    assert!(success);
+
+    let lines: Vec<&str> = stdout.lines().collect();
+    assert!(lines.len() >= 2);
+    assert!(lines[0].contains("network_address"));
+    assert!(lines[1].contains("2001:db8::"));
+}
+
+#[test]
+fn test_split_csv_output() {
+    let (stdout, _, success) = run_ipcalc(&[
+        "split",
+        "192.168.0.0/24",
+        "-p",
+        "26",
+        "--max",
+        "--format",
+        "csv",
+    ]);
+    assert!(success);
+
+    let lines: Vec<&str> = stdout.lines().collect();
+    // Should have comment lines, header, and 4 data rows (/24 -> /26 = 4)
+    let comment_lines: Vec<&&str> = lines.iter().filter(|l| l.starts_with('#')).collect();
+    assert!(
+        !comment_lines.is_empty(),
+        "CSV list should have comment metadata"
+    );
+    let data_lines: Vec<&&str> = lines
+        .iter()
+        .filter(|l| !l.starts_with('#') && !l.is_empty())
+        .collect();
+    // header + 4 data rows = 5
+    assert_eq!(data_lines.len(), 5);
+}
+
+#[test]
+fn test_contains_csv_output() {
+    let (stdout, _, success) = run_ipcalc(&[
+        "contains",
+        "192.168.1.0/24",
+        "192.168.1.100",
+        "--format",
+        "csv",
+    ]);
+    assert!(success);
+
+    let lines: Vec<&str> = stdout.lines().collect();
+    assert!(lines[0].contains("contained"));
+    assert!(lines[1].contains("true"));
+}
+
+#[test]
+fn test_batch_csv_output() {
+    let (stdout, _, success) = run_ipcalc(&["192.168.1.0/24", "10.0.0.0/8", "--format", "csv"]);
+    assert!(success);
+
+    let lines: Vec<&str> = stdout.lines().collect();
+    let comment_lines: Vec<&&str> = lines.iter().filter(|l| l.starts_with('#')).collect();
+    assert!(!comment_lines.is_empty());
+    let data_lines: Vec<&&str> = lines
+        .iter()
+        .filter(|l| !l.starts_with('#') && !l.is_empty())
+        .collect();
+    // header + 2 data rows = 3
+    assert_eq!(data_lines.len(), 3);
+}
+
+// ── YAML Output ──────────────────────────────────────────────────────
+
+#[test]
+fn test_ipv4_yaml_output() {
+    let (stdout, _, success) = run_ipcalc(&["192.168.1.0/24", "--format", "yaml"]);
+    assert!(success);
+    assert!(stdout.contains("network_address:"));
+    assert!(stdout.contains("192.168.1.0"));
+    assert!(stdout.contains("prefix_length:"));
+}
+
+#[test]
+fn test_ipv6_yaml_output() {
+    let (stdout, _, success) = run_ipcalc(&["2001:db8::/32", "--format", "yaml"]);
+    assert!(success);
+    assert!(stdout.contains("network_address:"));
+    assert!(stdout.contains("prefix_length:"));
+}
+
+#[test]
+fn test_split_yaml_output() {
+    let (stdout, _, success) = run_ipcalc(&[
+        "split",
+        "192.168.0.0/24",
+        "-p",
+        "26",
+        "-n",
+        "2",
+        "--format",
+        "yaml",
+    ]);
+    assert!(success);
+    assert!(stdout.contains("subnets:"));
+    assert!(stdout.contains("new_prefix:"));
+}
+
+#[test]
+fn test_contains_yaml_output() {
+    let (stdout, _, success) = run_ipcalc(&[
+        "contains",
+        "192.168.1.0/24",
+        "192.168.1.100",
+        "--format",
+        "yaml",
+    ]);
+    assert!(success);
+    assert!(stdout.contains("contained:"));
+    assert!(stdout.contains("true"));
+}

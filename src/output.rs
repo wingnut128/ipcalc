@@ -1,6 +1,6 @@
 use crate::batch::{BatchEntryResult, BatchResult, SubnetResult};
 use crate::contains::ContainsResult;
-use crate::error::Result;
+use crate::error::{IpCalcError, Result};
 use crate::from_range::{Ipv4FromRangeResult, Ipv6FromRangeResult};
 use crate::ipv4::Ipv4Subnet;
 use crate::ipv6::Ipv6Subnet;
@@ -17,6 +17,8 @@ pub enum OutputFormat {
     #[default]
     Json,
     Text,
+    Csv,
+    Yaml,
 }
 
 impl std::str::FromStr for OutputFormat {
@@ -26,9 +28,15 @@ impl std::str::FromStr for OutputFormat {
         match s.to_lowercase().as_str() {
             "json" => Ok(Self::Json),
             "text" | "plain" | "txt" => Ok(Self::Text),
+            "csv" => Ok(Self::Csv),
+            "yaml" | "yml" => Ok(Self::Yaml),
             _ => Err(format!("Unknown output format: {}", s)),
         }
     }
+}
+
+fn csv_err(e: impl std::fmt::Display) -> IpCalcError {
+    IpCalcError::Csv(e.to_string())
 }
 
 pub struct OutputWriter {
@@ -41,10 +49,14 @@ impl OutputWriter {
         Self { format, file_path }
     }
 
-    pub fn write<T: Serialize + TextOutput>(&self, data: &T) -> Result<String> {
+    pub fn write<T: Serialize + TextOutput + CsvOutput>(&self, data: &T) -> Result<String> {
         let output = match self.format {
             OutputFormat::Json => serde_json::to_string_pretty(data)?,
             OutputFormat::Text => data.to_text(),
+            OutputFormat::Csv => data.to_csv()?,
+            OutputFormat::Yaml => {
+                serde_saphyr::to_string(data).map_err(|e| IpCalcError::Yaml(e.to_string()))?
+            }
         };
 
         if let Some(ref path) = self.file_path {
@@ -55,6 +67,10 @@ impl OutputWriter {
         Ok(output)
     }
 }
+
+// ---------------------------------------------------------------------------
+// TextOutput trait + implementations
+// ---------------------------------------------------------------------------
 
 pub trait TextOutput {
     fn to_text(&self) -> String;
@@ -297,5 +313,354 @@ impl TextOutput for BatchResult {
             }
         }
         out
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CsvOutput trait + implementations
+// ---------------------------------------------------------------------------
+
+pub trait CsvOutput {
+    fn to_csv(&self) -> Result<String>;
+}
+
+fn ipv4_csv_header() -> &'static [&'static str] {
+    &[
+        "input",
+        "network_address",
+        "broadcast_address",
+        "subnet_mask",
+        "wildcard_mask",
+        "prefix_length",
+        "first_host",
+        "last_host",
+        "total_hosts",
+        "usable_hosts",
+        "network_class",
+        "is_private",
+        "address_type",
+    ]
+}
+
+fn write_ipv4_csv_record(wtr: &mut csv::Writer<Vec<u8>>, s: &Ipv4Subnet) -> Result<()> {
+    wtr.write_record([
+        &s.input,
+        &s.network_address,
+        &s.broadcast_address,
+        &s.subnet_mask,
+        &s.wildcard_mask,
+        &s.prefix_length.to_string(),
+        &s.first_host,
+        &s.last_host,
+        &s.total_hosts.to_string(),
+        &s.usable_hosts.to_string(),
+        &s.network_class,
+        &s.is_private.to_string(),
+        &s.address_type,
+    ])
+    .map_err(csv_err)
+}
+
+fn ipv6_csv_header() -> &'static [&'static str] {
+    &[
+        "input",
+        "network_address",
+        "network_address_full",
+        "last_address",
+        "last_address_full",
+        "prefix_length",
+        "total_addresses",
+        "hextets",
+        "address_type",
+    ]
+}
+
+fn write_ipv6_csv_record(wtr: &mut csv::Writer<Vec<u8>>, s: &Ipv6Subnet) -> Result<()> {
+    wtr.write_record([
+        &s.input,
+        &s.network_address,
+        &s.network_address_full,
+        &s.last_address,
+        &s.last_address_full,
+        &s.prefix_length.to_string(),
+        &s.total_addresses,
+        &s.hextets.join(":"),
+        &s.address_type,
+    ])
+    .map_err(csv_err)
+}
+
+fn finish_csv(wtr: csv::Writer<Vec<u8>>) -> Result<String> {
+    let bytes = wtr.into_inner().map_err(csv_err)?;
+    String::from_utf8(bytes).map_err(csv_err)
+}
+
+impl CsvOutput for Ipv4Subnet {
+    fn to_csv(&self) -> Result<String> {
+        let mut wtr = csv::Writer::from_writer(Vec::new());
+        wtr.write_record(ipv4_csv_header()).map_err(csv_err)?;
+        write_ipv4_csv_record(&mut wtr, self)?;
+        finish_csv(wtr)
+    }
+}
+
+impl CsvOutput for Ipv6Subnet {
+    fn to_csv(&self) -> Result<String> {
+        let mut wtr = csv::Writer::from_writer(Vec::new());
+        wtr.write_record(ipv6_csv_header()).map_err(csv_err)?;
+        write_ipv6_csv_record(&mut wtr, self)?;
+        finish_csv(wtr)
+    }
+}
+
+impl CsvOutput for ContainsResult {
+    fn to_csv(&self) -> Result<String> {
+        let mut wtr = csv::Writer::from_writer(Vec::new());
+        wtr.write_record([
+            "cidr",
+            "address",
+            "contained",
+            "network_address",
+            "broadcast_address",
+        ])
+        .map_err(csv_err)?;
+        wtr.write_record([
+            &self.cidr,
+            &self.address,
+            &self.contained.to_string(),
+            &self.network_address,
+            &self.broadcast_address,
+        ])
+        .map_err(csv_err)?;
+        finish_csv(wtr)
+    }
+}
+
+impl CsvOutput for SplitSummary {
+    fn to_csv(&self) -> Result<String> {
+        let mut wtr = csv::Writer::from_writer(Vec::new());
+        wtr.write_record(["supernet", "new_prefix", "available_subnets"])
+            .map_err(csv_err)?;
+        wtr.write_record([
+            &self.supernet,
+            &self.new_prefix.to_string(),
+            &self.available_subnets,
+        ])
+        .map_err(csv_err)?;
+        finish_csv(wtr)
+    }
+}
+
+impl CsvOutput for Ipv4SubnetList {
+    fn to_csv(&self) -> Result<String> {
+        let mut out = String::new();
+        writeln!(out, "# supernet: {}", self.supernet.input).unwrap();
+        writeln!(out, "# new_prefix: {}", self.new_prefix).unwrap();
+        writeln!(out, "# count: {}", self.requested_count).unwrap();
+
+        let mut wtr = csv::Writer::from_writer(Vec::new());
+        wtr.write_record(ipv4_csv_header()).map_err(csv_err)?;
+        for subnet in &self.subnets {
+            write_ipv4_csv_record(&mut wtr, subnet)?;
+        }
+        out.push_str(&finish_csv(wtr)?);
+        Ok(out)
+    }
+}
+
+impl CsvOutput for Ipv6SubnetList {
+    fn to_csv(&self) -> Result<String> {
+        let mut out = String::new();
+        writeln!(out, "# supernet: {}", self.supernet.input).unwrap();
+        writeln!(out, "# new_prefix: {}", self.new_prefix).unwrap();
+        writeln!(out, "# count: {}", self.requested_count).unwrap();
+
+        let mut wtr = csv::Writer::from_writer(Vec::new());
+        wtr.write_record(ipv6_csv_header()).map_err(csv_err)?;
+        for subnet in &self.subnets {
+            write_ipv6_csv_record(&mut wtr, subnet)?;
+        }
+        out.push_str(&finish_csv(wtr)?);
+        Ok(out)
+    }
+}
+
+impl CsvOutput for Ipv4SummaryResult {
+    fn to_csv(&self) -> Result<String> {
+        let mut out = String::new();
+        writeln!(out, "# input_count: {}", self.input_count).unwrap();
+        writeln!(out, "# output_count: {}", self.output_count).unwrap();
+
+        let mut wtr = csv::Writer::from_writer(Vec::new());
+        wtr.write_record(ipv4_csv_header()).map_err(csv_err)?;
+        for subnet in &self.cidrs {
+            write_ipv4_csv_record(&mut wtr, subnet)?;
+        }
+        out.push_str(&finish_csv(wtr)?);
+        Ok(out)
+    }
+}
+
+impl CsvOutput for Ipv6SummaryResult {
+    fn to_csv(&self) -> Result<String> {
+        let mut out = String::new();
+        writeln!(out, "# input_count: {}", self.input_count).unwrap();
+        writeln!(out, "# output_count: {}", self.output_count).unwrap();
+
+        let mut wtr = csv::Writer::from_writer(Vec::new());
+        wtr.write_record(ipv6_csv_header()).map_err(csv_err)?;
+        for subnet in &self.cidrs {
+            write_ipv6_csv_record(&mut wtr, subnet)?;
+        }
+        out.push_str(&finish_csv(wtr)?);
+        Ok(out)
+    }
+}
+
+impl CsvOutput for Ipv4FromRangeResult {
+    fn to_csv(&self) -> Result<String> {
+        let mut out = String::new();
+        writeln!(out, "# start_address: {}", self.start_address).unwrap();
+        writeln!(out, "# end_address: {}", self.end_address).unwrap();
+        writeln!(out, "# cidr_count: {}", self.cidr_count).unwrap();
+
+        let mut wtr = csv::Writer::from_writer(Vec::new());
+        wtr.write_record(ipv4_csv_header()).map_err(csv_err)?;
+        for subnet in &self.cidrs {
+            write_ipv4_csv_record(&mut wtr, subnet)?;
+        }
+        out.push_str(&finish_csv(wtr)?);
+        Ok(out)
+    }
+}
+
+impl CsvOutput for Ipv6FromRangeResult {
+    fn to_csv(&self) -> Result<String> {
+        let mut out = String::new();
+        writeln!(out, "# start_address: {}", self.start_address).unwrap();
+        writeln!(out, "# end_address: {}", self.end_address).unwrap();
+        writeln!(out, "# cidr_count: {}", self.cidr_count).unwrap();
+
+        let mut wtr = csv::Writer::from_writer(Vec::new());
+        wtr.write_record(ipv6_csv_header()).map_err(csv_err)?;
+        for subnet in &self.cidrs {
+            write_ipv6_csv_record(&mut wtr, subnet)?;
+        }
+        out.push_str(&finish_csv(wtr)?);
+        Ok(out)
+    }
+}
+
+impl CsvOutput for BatchResult {
+    fn to_csv(&self) -> Result<String> {
+        let mut out = String::new();
+        writeln!(out, "# count: {}", self.count).unwrap();
+
+        let mut wtr = csv::Writer::from_writer(Vec::new());
+        // Unified header covering both IPv4/IPv6 fields + error column
+        wtr.write_record([
+            "cidr",
+            "network_address",
+            "broadcast_address",
+            "subnet_mask",
+            "wildcard_mask",
+            "prefix_length",
+            "first_host",
+            "last_host",
+            "total_hosts",
+            "usable_hosts",
+            "network_class",
+            "is_private",
+            "network_address_full",
+            "last_address",
+            "last_address_full",
+            "total_addresses",
+            "hextets",
+            "address_type",
+            "error",
+        ])
+        .map_err(csv_err)?;
+
+        for entry in &self.results {
+            match &entry.result {
+                BatchEntryResult::Ok { subnet } => match subnet.as_ref() {
+                    SubnetResult::V4(s) => {
+                        wtr.write_record([
+                            &entry.cidr,
+                            &s.network_address,
+                            &s.broadcast_address,
+                            &s.subnet_mask,
+                            &s.wildcard_mask,
+                            &s.prefix_length.to_string(),
+                            &s.first_host,
+                            &s.last_host,
+                            &s.total_hosts.to_string(),
+                            &s.usable_hosts.to_string(),
+                            &s.network_class,
+                            &s.is_private.to_string(),
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            &s.address_type,
+                            "",
+                        ])
+                        .map_err(csv_err)?;
+                    }
+                    SubnetResult::V6(s) => {
+                        wtr.write_record([
+                            &entry.cidr,
+                            &s.network_address,
+                            "",
+                            "",
+                            "",
+                            &s.prefix_length.to_string(),
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            &s.network_address_full,
+                            &s.last_address,
+                            &s.last_address_full,
+                            &s.total_addresses,
+                            &s.hextets.join(":"),
+                            &s.address_type,
+                            "",
+                        ])
+                        .map_err(csv_err)?;
+                    }
+                },
+                BatchEntryResult::Err { error } => {
+                    wtr.write_record([
+                        &entry.cidr,
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        error.as_str(),
+                    ])
+                    .map_err(csv_err)?;
+                }
+            }
+        }
+
+        out.push_str(&finish_csv(wtr)?);
+        Ok(out)
     }
 }

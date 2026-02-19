@@ -261,3 +261,71 @@ async fn test_batch_pretty() {
     assert!(body.contains('\n'));
     assert!(body.contains("  "));
 }
+
+// ── CSV Format ──────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn test_v4_csv_format() {
+    let (status, body) = get("/v4?cidr=192.168.1.0/24&format=csv").await;
+    assert_eq!(status, 200);
+    let lines: Vec<&str> = body.lines().collect();
+    assert!(lines[0].contains("network_address"));
+    assert!(lines[1].contains("192.168.1.0"));
+}
+
+#[tokio::test]
+async fn test_v6_csv_format() {
+    let (status, body) = get("/v6?cidr=2001:db8::/32&format=csv").await;
+    assert_eq!(status, 200);
+    let lines: Vec<&str> = body.lines().collect();
+    assert!(lines[0].contains("network_address"));
+    assert!(lines[1].contains("2001:db8::"));
+}
+
+#[tokio::test]
+async fn test_v4_split_csv_format() {
+    let (status, body) = get("/v4/split?cidr=192.168.0.0/24&prefix=26&max=true&format=csv").await;
+    assert_eq!(status, 200);
+    let data_lines: Vec<&str> = body
+        .lines()
+        .filter(|l| !l.starts_with('#') && !l.is_empty())
+        .collect();
+    // header + 4 subnets
+    assert_eq!(data_lines.len(), 5);
+}
+
+// ── YAML Format ─────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn test_v4_yaml_format() {
+    let (status, body) = get("/v4?cidr=192.168.1.0/24&format=yaml").await;
+    assert_eq!(status, 200);
+    assert!(body.contains("network_address:"));
+    assert!(body.contains("192.168.1.0"));
+}
+
+#[tokio::test]
+async fn test_v6_yaml_format() {
+    let (status, body) = get("/v6?cidr=2001:db8::/32&format=yaml").await;
+    assert_eq!(status, 200);
+    assert!(body.contains("network_address:"));
+    assert!(body.contains("prefix_length:"));
+}
+
+// ── Error responses stay JSON regardless of format ──────────────────
+
+#[tokio::test]
+async fn test_error_stays_json_with_csv_format() {
+    let (status, body) = get("/v4?cidr=invalid&format=csv").await;
+    assert_eq!(status, 400);
+    let json: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert!(json["error"].is_string());
+}
+
+#[tokio::test]
+async fn test_error_stays_json_with_yaml_format() {
+    let (status, body) = get("/v4?cidr=invalid&format=yaml").await;
+    assert_eq!(status, 400);
+    let json: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert!(json["error"].is_string());
+}
