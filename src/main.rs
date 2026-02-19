@@ -1,7 +1,8 @@
 use clap::{CommandFactory, Parser};
-use ipcalc::api::create_router;
+use ipcalc::api::{RouterConfig, create_router};
 use ipcalc::batch::process_batch;
 use ipcalc::cli::{Cli, Commands};
+use ipcalc::config::{CliOverrides, ServerConfig};
 use ipcalc::contains::{check_ipv4_contains, check_ipv6_contains};
 use ipcalc::from_range::{from_range_ipv4, from_range_ipv6};
 use ipcalc::ipv4::Ipv4Subnet;
@@ -12,7 +13,7 @@ use ipcalc::subnet_generator::{count_subnets, generate_ipv4_subnets, generate_ip
 use ipcalc::summarize::{summarize_ipv4, summarize_ipv6};
 use std::io::{self, BufRead, Write};
 use std::net::SocketAddr;
-use tracing::info;
+use tracing::{info, warn};
 
 /// Print to stdout, handling broken pipe errors gracefully.
 /// When output is piped to commands like `head`, the pipe may close early.
@@ -24,6 +25,32 @@ fn print_stdout(s: &str) {
         eprintln!("Error writing to stdout: {}", e);
         std::process::exit(1);
     }
+}
+
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .expect("failed to install SIGTERM handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        () = ctrl_c => {},
+        () = terminate => {},
+    }
+
+    info!("Shutdown signal received, starting graceful shutdown");
 }
 
 #[tokio::main]
@@ -277,6 +304,15 @@ async fn main() {
             log_level,
             log_file,
             log_json,
+            config,
+            enable_swagger,
+            max_batch_size,
+            max_range_cidrs,
+            max_summarize_inputs,
+            max_body_size,
+            rate_limit_per_second,
+            rate_limit_burst,
+            timeout,
         }) => {
             // Parse and validate log level
             let level = match parse_log_level(&log_level) {
@@ -296,6 +332,42 @@ async fn main() {
 
             // Keep the guard alive for the lifetime of the program
             let _guard = init_logging(&log_config);
+
+            // Load server config
+            let mut server_config = if let Some(ref path) = config {
+                match ServerConfig::load(path) {
+                    Ok(c) => {
+                        info!("Loaded config from {}", path);
+                        c
+                    }
+                    Err(e) => {
+                        eprintln!("Error loading config: {}", e);
+                        std::process::exit(1);
+                    }
+                }
+            } else {
+                ServerConfig::default()
+            };
+
+            // Apply CLI overrides
+            server_config.merge_cli_overrides(&CliOverrides {
+                enable_swagger,
+                max_batch_size,
+                max_range_cidrs,
+                max_summarize_inputs,
+                max_body_size,
+                rate_limit_per_second,
+                rate_limit_burst,
+                timeout,
+            });
+
+            // Bind-address warning
+            if address != "127.0.0.1" && address != "::1" {
+                warn!(
+                    "Binding to non-loopback address '{}'. Use 127.0.0.1 for local-only access.",
+                    address
+                );
+            }
 
             let addr: SocketAddr = format!("{}:{}", address, port)
                 .parse()
@@ -320,14 +392,26 @@ async fn main() {
             println!("  GET /v4/from-range?start=<ip>&end=<ip>       - IPv4 range to CIDRs");
             println!("  GET /v6/from-range?start=<ip>&end=<ip>       - IPv6 range to CIDRs");
             println!("  POST /batch                                  - Batch CIDR processing");
-            #[cfg(feature = "swagger")]
-            {
-                println!("  GET /swagger-ui          - Interactive API documentation");
-                println!("  GET /api-docs/openapi.json - OpenAPI specification");
+            if server_config.enable_swagger {
+                #[cfg(feature = "swagger")]
+                {
+                    println!("  GET /swagger-ui          - Interactive API documentation");
+                    println!("  GET /api-docs/openapi.json - OpenAPI specification");
+                }
             }
 
+            let router_config = RouterConfig {
+                server: server_config,
+            };
+            let router = create_router(router_config);
+
             let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-            axum::serve(listener, create_router()).await.unwrap();
+            axum::serve(listener, router)
+                .with_graceful_shutdown(shutdown_signal())
+                .await
+                .unwrap();
+
+            info!("Server shut down gracefully");
         }
         None => {
             // Show help when no arguments are provided

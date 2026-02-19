@@ -27,14 +27,19 @@ pub struct Ipv6FromRangeResult {
     pub cidrs: Vec<Ipv6Subnet>,
 }
 
+pub const DEFAULT_MAX_GENERATED_CIDRS: usize = 1_000_000;
+
 // ---------------------------------------------------------------------------
 // Core algorithms
 // ---------------------------------------------------------------------------
 
-fn range_to_cidrs_v4(start: u32, end: u32) -> Vec<(u32, u8)> {
+fn range_to_cidrs_v4(start: u32, end: u32, limit: usize) -> Vec<(u32, u8)> {
     let mut result = Vec::new();
     let mut current = start;
     while current <= end {
+        if result.len() > limit {
+            break;
+        }
         let max_bits = if current == 0 {
             32
         } else {
@@ -56,10 +61,13 @@ fn range_to_cidrs_v4(start: u32, end: u32) -> Vec<(u32, u8)> {
     result
 }
 
-fn range_to_cidrs_v6(start: u128, end: u128) -> Vec<(u128, u8)> {
+fn range_to_cidrs_v6(start: u128, end: u128, limit: usize) -> Vec<(u128, u8)> {
     let mut result = Vec::new();
     let mut current = start;
     while current <= end {
+        if result.len() > limit {
+            break;
+        }
         let max_bits = if current == 0 {
             128
         } else {
@@ -89,6 +97,14 @@ fn range_to_cidrs_v6(start: u128, end: u128) -> Vec<(u128, u8)> {
 // ---------------------------------------------------------------------------
 
 pub fn from_range_ipv4(start: &str, end: &str) -> Result<Ipv4FromRangeResult> {
+    from_range_ipv4_with_limit(start, end, DEFAULT_MAX_GENERATED_CIDRS)
+}
+
+pub fn from_range_ipv4_with_limit(
+    start: &str,
+    end: &str,
+    max_cidrs: usize,
+) -> Result<Ipv4FromRangeResult> {
     let start_addr = Ipv4Addr::from_str(start)
         .map_err(|_| IpCalcError::InvalidIpv4Address(start.to_string()))?;
     let end_addr =
@@ -104,7 +120,14 @@ pub fn from_range_ipv4(start: &str, end: &str) -> Result<Ipv4FromRangeResult> {
         ));
     }
 
-    let pairs = range_to_cidrs_v4(start_u32, end_u32);
+    let pairs = range_to_cidrs_v4(start_u32, end_u32, max_cidrs);
+    if pairs.len() > max_cidrs {
+        return Err(IpCalcError::FromRangeLimitExceeded {
+            count: pairs.len(),
+            limit: max_cidrs,
+        });
+    }
+
     let mut cidrs = Vec::with_capacity(pairs.len());
     for (network, prefix) in &pairs {
         let addr = Ipv4Addr::from(*network);
@@ -120,6 +143,14 @@ pub fn from_range_ipv4(start: &str, end: &str) -> Result<Ipv4FromRangeResult> {
 }
 
 pub fn from_range_ipv6(start: &str, end: &str) -> Result<Ipv6FromRangeResult> {
+    from_range_ipv6_with_limit(start, end, DEFAULT_MAX_GENERATED_CIDRS)
+}
+
+pub fn from_range_ipv6_with_limit(
+    start: &str,
+    end: &str,
+    max_cidrs: usize,
+) -> Result<Ipv6FromRangeResult> {
     let start_addr = Ipv6Addr::from_str(start)
         .map_err(|_| IpCalcError::InvalidIpv6Address(start.to_string()))?;
     let end_addr =
@@ -135,7 +166,14 @@ pub fn from_range_ipv6(start: &str, end: &str) -> Result<Ipv6FromRangeResult> {
         ));
     }
 
-    let pairs = range_to_cidrs_v6(start_u128, end_u128);
+    let pairs = range_to_cidrs_v6(start_u128, end_u128, max_cidrs);
+    if pairs.len() > max_cidrs {
+        return Err(IpCalcError::FromRangeLimitExceeded {
+            count: pairs.len(),
+            limit: max_cidrs,
+        });
+    }
+
     let mut cidrs = Vec::with_capacity(pairs.len());
     for (network, prefix) in &pairs {
         let addr = Ipv6Addr::from(*network);
@@ -240,6 +278,15 @@ mod tests {
         let result = from_range_ipv4("0.0.0.0", "255.255.255.255").unwrap();
         assert_eq!(result.cidr_count, 1);
         assert_eq!(result.cidrs[0].prefix_length, 0);
+    }
+
+    #[test]
+    fn test_from_range_limit_exceeded_v4() {
+        // A range that generates many CIDRs, limited to 2
+        let result = from_range_ipv4_with_limit("192.168.1.1", "192.168.1.20", 2);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("exceeds maximum"));
     }
 
     #[test]

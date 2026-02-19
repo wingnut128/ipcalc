@@ -17,8 +17,16 @@ pub struct Ipv6Subnet {
     pub address_type: String,
 }
 
+const MAX_INPUT_LENGTH: usize = 256;
+
 impl Ipv6Subnet {
     pub fn from_cidr(cidr: &str) -> Result<Self> {
+        if cidr.len() > MAX_INPUT_LENGTH {
+            return Err(IpCalcError::InputTooLong {
+                length: cidr.len(),
+                limit: MAX_INPUT_LENGTH,
+            });
+        }
         let parts: Vec<&str> = cidr.split('/').collect();
         if parts.len() != 2 {
             return Err(IpCalcError::InvalidCidr(cidr.to_string()));
@@ -186,5 +194,14 @@ mod tests {
     fn test_invalid_prefix() {
         let result = Ipv6Subnet::from_cidr("2001:db8::/129");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_input_too_long() {
+        let long_input = "a".repeat(300);
+        let result = Ipv6Subnet::from_cidr(&long_input);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("exceeds maximum length"));
     }
 }

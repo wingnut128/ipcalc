@@ -19,6 +19,7 @@ pub mod cli;
 pub mod output;
 
 // Infrastructure
+pub mod config;
 pub mod error;
 pub mod logging;
 
@@ -26,7 +27,7 @@ pub mod logging;
 pub mod tui;
 
 // Public API re-exports
-pub use batch::{BatchResult, process_batch};
+pub use batch::{BatchResult, process_batch, process_batch_with_limit};
 pub use contains::ContainsResult;
 pub use from_range::{Ipv4FromRangeResult, Ipv6FromRangeResult};
 pub use ipv4::Ipv4Subnet;

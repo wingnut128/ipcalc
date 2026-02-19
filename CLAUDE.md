@@ -59,6 +59,10 @@ cargo test test_name
 make serve          # Run on localhost:8080
 make serve-debug    # Run with debug logging
 
+# API server with config file and overrides
+ipcalc serve --config ipcalc.toml
+ipcalc serve --enable-swagger --max-batch-size 500 --timeout 60
+
 # Fuzz testing (requires: rustup toolchain install nightly && cargo install cargo-fuzz)
 make fuzz                                      # Run fuzz_cidr_parsing for 60s
 make fuzz FUZZ_TARGET=fuzz_contains FUZZ_DURATION=30  # Run specific target
