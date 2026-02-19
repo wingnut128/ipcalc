@@ -62,7 +62,15 @@ make serve-debug    # Run with debug logging
 # Fuzz testing (requires: rustup toolchain install nightly && cargo install cargo-fuzz)
 make fuzz                                      # Run fuzz_cidr_parsing for 60s
 make fuzz FUZZ_TARGET=fuzz_contains FUZZ_DURATION=30  # Run specific target
+
+# CLI usage
+ipcalc v4 192.168.1.0/24              # IPv4 subnet info
+ipcalc v6 2001:db8::/48               # IPv6 prefix info
+ipcalc split 10.0.0.0/8 -p 16 -n 10   # Generate 10 /16 subnets
+ipcalc split 10.0.0.0/8 -p 16 --max   # Generate all possible /16 subnets
 ```
+
+Global options: `--format json|text`, `--output <file>`
 
 **Important**: Run `make setup` after cloning to install git hooks that enforce formatting and linting on commits.
 
@@ -87,15 +95,3 @@ This is a Rust CLI/API for IPv4 and IPv6 subnet calculations.
 - Logging: `tracing` with `#[instrument]` on API handlers
 - CLI: clap derive with subcommands (`v4`, `v6`, `split`, `serve`)
 - Tests: Unit tests in modules, integration tests in `tests/` call binary via subprocess
-
-## CLI Commands
-
-```bash
-ipcalc v4 192.168.1.0/24              # IPv4 subnet info
-ipcalc v6 2001:db8::/48               # IPv6 prefix info
-ipcalc split 10.0.0.0/8 -p 16 -n 10   # Generate 10 /16 subnets
-ipcalc split 10.0.0.0/8 -p 16 --max   # Generate all possible /16 subnets
-ipcalc serve                          # Start API server
-```
-
-Global options: `--format json|text`, `--output <file>`
