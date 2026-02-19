@@ -15,10 +15,13 @@ A fast IPv4 and IPv6 subnet calculator written in Rust. Available as both a CLI 
 - **Range to CIDR**: convert an arbitrary IP range (start–end) into the minimal set of CIDR blocks
 - **Address containment**: check if an IP address belongs to a CIDR range
 - **Interactive TUI**: Terminal user interface with real-time calculations and split mode (optional feature)
-- **Multiple output formats**: JSON (default) or plain text
+- **Batch processing**: process multiple CIDRs via positional arguments, `--stdin`, or the `POST /batch` API endpoint
+- **Multiple output formats**: JSON (default), plain text, CSV, and YAML
 - **File output**: write results directly to a file
 - **HTTP API**: REST endpoints for all calculations
 - **OpenAPI documentation**: Machine-readable API specification for easy integration with tools like Swagger Editor, Postman, and Insomnia
+- **Configurable security**: rate limiting, request size limits, timeouts, restrictive CORS, and security headers
+- **TOML configuration**: server settings via config file with CLI flag overrides
 
 ## Installation
 
@@ -50,6 +53,12 @@ ipcalc 192.168.1.0/24
 
 # Plain text output
 ipcalc 192.168.1.0/24 --format text
+
+# CSV output (spreadsheet-importable)
+ipcalc 192.168.1.0/24 --format csv
+
+# YAML output (IaC-friendly)
+ipcalc 192.168.1.0/24 --format yaml
 
 # Output to file
 ipcalc 10.0.0.0/8 -o results.json
@@ -140,6 +149,23 @@ ipcalc contains 192.168.1.0/24 10.0.0.1 --format text
 ipcalc contains 2001:db8::/32 2001:db8::1
 ```
 
+### Batch Processing
+
+Process multiple CIDRs in a single invocation:
+
+```bash
+# Multiple CIDRs as positional arguments
+ipcalc 192.168.1.0/24 10.0.0.0/8 172.16.0.0/12
+
+# Read CIDRs from stdin (one per line, blank lines and # comments skipped)
+cat cidrs.txt | ipcalc --stdin
+
+# Combine with any output format
+echo -e "192.168.1.0/24\n10.0.0.0/8" | ipcalc --stdin --format yaml
+```
+
+Invalid CIDRs in a batch are reported per-entry without failing the entire operation.
+
 ### Interactive TUI
 
 Launch an interactive terminal user interface for real-time subnet calculations and splitting:
@@ -188,7 +214,32 @@ ipcalc serve --address 0.0.0.0 --port 3000
 
 # With logging
 ipcalc serve --log-level debug --log-file /var/log/ipcalc.log
+
+# With TOML config file
+ipcalc serve --config ipcalc.toml
+
+# With CLI overrides
+ipcalc serve --enable-swagger --max-batch-size 500 --timeout 60
 ```
+
+#### Server Configuration
+
+The server can be configured via a TOML file (`--config`) and/or CLI flags. CLI flags override config file values, and unspecified options use defaults.
+
+Example `ipcalc.toml`:
+
+```toml
+max_batch_size = 10000        # Max CIDRs per batch request (default: 10,000)
+max_generated_cidrs = 1000000 # Max CIDRs from from-range (default: 1,000,000)
+max_summarize_inputs = 10000  # Max input CIDRs for summarize (default: 10,000)
+max_body_size = 1048576       # Max request body in bytes (default: 1 MB)
+rate_limit_per_second = 20    # Sustained rate limit (default: 20)
+rate_limit_burst = 50         # Burst rate limit (default: 50)
+timeout_seconds = 30          # Request timeout (default: 30s)
+enable_swagger = false        # Swagger UI at /swagger-ui (default: false)
+```
+
+**Security defaults**: All endpoints are protected by per-IP rate limiting, request body size limits, request timeouts, restrictive CORS (no origins allowed by default), and security headers (`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Cache-Control: no-store`).
 
 #### API Endpoints
 
@@ -208,8 +259,11 @@ ipcalc serve --log-level debug --log-file /var/log/ipcalc.log
 | `GET /v6/summarize?cidrs=<cidr>,<cidr>` | Summarize IPv6 CIDRs | `/v6/summarize?cidrs=2001:db8::/48,2001:db8:1::/48` |
 | `GET /v4/from-range?start=<ip>&end=<ip>` | IPv4 range to CIDRs | `/v4/from-range?start=192.168.1.10&end=192.168.1.20` |
 | `GET /v6/from-range?start=<ip>&end=<ip>` | IPv6 range to CIDRs | `/v6/from-range?start=2001:db8::1&end=2001:db8::ff` |
-| `GET /swagger-ui` | Interactive Swagger UI | `/swagger-ui` |
-| `GET /api-docs/openapi.json` | OpenAPI 3.0 specification | `/api-docs/openapi.json` |
+| `POST /batch` | Batch CIDR processing | See example below |
+| `GET /swagger-ui` | Interactive Swagger UI (requires `--enable-swagger`) | `/swagger-ui` |
+| `GET /api-docs/openapi.json` | OpenAPI 3.0 specification (requires `--enable-swagger`) | `/api-docs/openapi.json` |
+
+All GET endpoints accept an optional `format` query parameter (`json`, `text`, `csv`, `yaml`) and `pretty=true` for indented JSON.
 
 #### Example API Requests
 
@@ -235,15 +289,27 @@ curl "http://localhost:8080/v4/summarize?cidrs=192.168.0.0/24,192.168.1.0/24"
 # Convert IP range to CIDRs
 curl "http://localhost:8080/v4/from-range?start=192.168.1.10&end=192.168.1.20"
 
-# Get OpenAPI specification
+# Batch processing (mixed IPv4/IPv6, auto-detected)
+curl -X POST "http://localhost:8080/batch" \
+  -H "Content-Type: application/json" \
+  -d '{"cidrs": ["192.168.1.0/24", "2001:db8::/32"]}'
+
+# Any endpoint with CSV or YAML output
+curl "http://localhost:8080/v4?cidr=192.168.1.0/24&format=csv"
+curl "http://localhost:8080/v4?cidr=192.168.1.0/24&format=yaml"
+
+# Get OpenAPI specification (requires --enable-swagger)
 curl "http://localhost:8080/api-docs/openapi.json"
 ```
 
 #### OpenAPI Documentation
 
-The API provides interactive Swagger UI documentation and a complete OpenAPI 3.0 specification:
+The API provides interactive Swagger UI documentation and a complete OpenAPI 3.0 specification. Swagger UI is disabled by default and must be enabled with `--enable-swagger`:
 
 ```bash
+# Start server with Swagger UI enabled
+ipcalc serve --enable-swagger
+
 # Access interactive Swagger UI in your browser
 open http://localhost:8080/swagger-ui
 
@@ -276,28 +342,31 @@ cargo build --release --no-default-features
 ## CLI Reference
 
 ```
-ipcalc [OPTIONS] [CIDR] [COMMAND]
+ipcalc [OPTIONS] [CIDR]... [COMMAND]
 
 Arguments:
-  [CIDR]  IP address in CIDR notation (e.g., 192.168.1.0/24 or 2001:db8::/48)
+  [CIDR]...  IP address(es) in CIDR notation (e.g., 192.168.1.0/24 or 2001:db8::/48)
 
 Commands:
   split       Generate subnets from a supernet
   from-range  Convert an IP range (start–end) into minimal CIDR blocks
   contains    Check if an IP address is contained in a subnet
   summarize   Summarize/aggregate CIDRs into the minimal covering set
-  serve      Start the HTTP API server
-  help       Print help for a command
+  serve       Start the HTTP API server
+  help        Print help for a command
 
 Options:
-  -f, --format <FORMAT>  Output format [default: json] [possible values: json, text]
+  -f, --format <FORMAT>  Output format [default: json] [possible values: json, text, csv, yaml]
   -o, --output <OUTPUT>  Output file path (prints to stdout if not specified)
+      --stdin            Read CIDRs from standard input (one per line)
       --tui              Launch interactive TUI mode (requires tui feature)
   -h, --help             Print help
   -V, --version          Print version
 ```
 
 **Notes:**
+- Multiple CIDRs can be passed as positional arguments for batch processing
+- The `--stdin` flag reads CIDRs from stdin (blank lines and `#` comments are skipped)
 - The legacy `v4` and `v6` subcommands are still supported for backwards compatibility but are deprecated
 - The `--tui` flag is only available when built with the `tui` feature: `cargo build --features tui`
 
