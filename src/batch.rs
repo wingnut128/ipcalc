@@ -40,13 +40,26 @@ pub struct BatchResult {
     pub results: Vec<BatchEntry>,
 }
 
+pub const DEFAULT_MAX_BATCH_SIZE: usize = 10_000;
+
 /// Process a batch of CIDR strings, auto-detecting IPv4 vs IPv6 per entry.
 ///
 /// Returns `EmptyCidrList` if the input slice is empty. Individual parsing
 /// errors are captured per-entry rather than aborting the entire batch.
 pub fn process_batch(cidrs: &[String]) -> Result<BatchResult> {
+    process_batch_with_limit(cidrs, DEFAULT_MAX_BATCH_SIZE)
+}
+
+/// Process a batch of CIDR strings with a configurable size limit.
+pub fn process_batch_with_limit(cidrs: &[String], max_batch_size: usize) -> Result<BatchResult> {
     if cidrs.is_empty() {
         return Err(IpCalcError::EmptyCidrList);
+    }
+    if cidrs.len() > max_batch_size {
+        return Err(IpCalcError::BatchSizeExceeded {
+            count: cidrs.len(),
+            limit: max_batch_size,
+        });
     }
 
     let results: Vec<BatchEntry> = cidrs
@@ -163,6 +176,15 @@ mod tests {
         let cidrs: Vec<String> = vec![];
         let result = process_batch(&cidrs);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_batch_size_exceeded() {
+        let cidrs: Vec<String> = (0..5).map(|i| format!("10.0.{}.0/24", i)).collect();
+        let result = process_batch_with_limit(&cidrs, 3);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("exceeds maximum"));
     }
 
     #[test]

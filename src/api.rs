@@ -1,11 +1,18 @@
+use std::sync::Arc;
+use std::time::Duration;
+
 use axum::{
-    Router,
+    Extension, Router,
     extract::Query,
-    http::{StatusCode, header},
+    http::{HeaderValue, StatusCode, header},
     response::{IntoResponse, Json, Response},
     routing::{get, post},
 };
 use serde::{Deserialize, Serialize};
+use tower_http::cors::CorsLayer;
+use tower_http::limit::RequestBodyLimitLayer;
+use tower_http::set_header::SetResponseHeaderLayer;
+use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
 use tracing::{info, instrument, warn};
 #[cfg(feature = "swagger")]
@@ -15,14 +22,15 @@ use utoipa_swagger_ui::SwaggerUi;
 
 #[cfg(feature = "swagger")]
 use crate::batch::BatchResult;
-use crate::batch::process_batch;
+use crate::batch::process_batch_with_limit;
+use crate::config::ServerConfig;
 #[cfg(feature = "swagger")]
 use crate::contains::ContainsResult;
 use crate::contains::{check_ipv4_contains, check_ipv6_contains};
 use crate::error::IpCalcError;
 #[cfg(feature = "swagger")]
 use crate::from_range::{Ipv4FromRangeResult, Ipv6FromRangeResult};
-use crate::from_range::{from_range_ipv4, from_range_ipv6};
+use crate::from_range::{from_range_ipv4_with_limit, from_range_ipv6_with_limit};
 use crate::ipv4::Ipv4Subnet;
 use crate::ipv6::Ipv6Subnet;
 use crate::output::{CsvOutput, OutputFormat, TextOutput};
@@ -31,7 +39,7 @@ use crate::subnet_generator::{Ipv4SubnetList, Ipv6SubnetList, SplitSummary};
 use crate::subnet_generator::{count_subnets, generate_ipv4_subnets, generate_ipv6_subnets};
 #[cfg(feature = "swagger")]
 use crate::summarize::{Ipv4SummaryResult, Ipv6SummaryResult};
-use crate::summarize::{summarize_ipv4, summarize_ipv6};
+use crate::summarize::{summarize_ipv4_with_limit, summarize_ipv6_with_limit};
 
 #[cfg(feature = "swagger")]
 #[derive(OpenApi)]
@@ -64,6 +72,11 @@ use crate::summarize::{summarize_ipv4, summarize_ipv6};
     )
 )]
 pub struct ApiDoc;
+
+#[derive(Default)]
+pub struct RouterConfig {
+    pub server: ServerConfig,
+}
 
 #[derive(Deserialize)]
 #[cfg_attr(feature = "swagger", derive(ToSchema, IntoParams))]
@@ -195,6 +208,20 @@ impl From<ApiOutputFormat> for OutputFormat {
     }
 }
 
+fn build_response(status: StatusCode, content_type: &str, body: String) -> Response {
+    match Response::builder()
+        .status(status)
+        .header(header::CONTENT_TYPE, content_type)
+        .body(body.into())
+    {
+        Ok(resp) => resp,
+        Err(_) => Response::builder()
+            .status(StatusCode::INTERNAL_SERVER_ERROR)
+            .body("Internal Server Error".into())
+            .expect("fallback response must be valid"),
+    }
+}
+
 fn format_response<T: Serialize + TextOutput + CsvOutput>(
     value: T,
     format: ApiOutputFormat,
@@ -204,30 +231,27 @@ fn format_response<T: Serialize + TextOutput + CsvOutput>(
     match format {
         ApiOutputFormat::Json => {
             let body = if pretty {
-                serde_json::to_string_pretty(&value).unwrap()
+                serde_json::to_string_pretty(&value)
             } else {
-                serde_json::to_string(&value).unwrap()
+                serde_json::to_string(&value)
             };
-            Response::builder()
-                .status(status)
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(body.into())
-                .unwrap()
+            match body {
+                Ok(b) => build_response(status, "application/json", b),
+                Err(e) => json_response(
+                    ErrorResponse {
+                        error: e.to_string(),
+                    },
+                    false,
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                ),
+            }
         }
         ApiOutputFormat::Text => {
             let body = value.to_text();
-            Response::builder()
-                .status(status)
-                .header(header::CONTENT_TYPE, "text/plain")
-                .body(body.into())
-                .unwrap()
+            build_response(status, "text/plain", body)
         }
         ApiOutputFormat::Csv => match value.to_csv() {
-            Ok(body) => Response::builder()
-                .status(status)
-                .header(header::CONTENT_TYPE, "text/csv")
-                .body(body.into())
-                .unwrap(),
+            Ok(body) => build_response(status, "text/csv", body),
             Err(e) => json_response(
                 ErrorResponse {
                     error: e.to_string(),
@@ -237,11 +261,7 @@ fn format_response<T: Serialize + TextOutput + CsvOutput>(
             ),
         },
         ApiOutputFormat::Yaml => match serde_saphyr::to_string(&value) {
-            Ok(body) => Response::builder()
-                .status(status)
-                .header(header::CONTENT_TYPE, "application/yaml")
-                .body(body.into())
-                .unwrap(),
+            Ok(body) => build_response(status, "application/yaml", body),
             Err(e) => json_response(
                 ErrorResponse {
                     error: IpCalcError::Yaml(e.to_string()).to_string(),
@@ -253,7 +273,9 @@ fn format_response<T: Serialize + TextOutput + CsvOutput>(
     }
 }
 
-pub fn create_router() -> Router {
+pub fn create_router(config: RouterConfig) -> Router {
+    let config_ext = Arc::new(config.server.clone());
+
     let router = Router::new()
         .route("/health", get(health))
         .route("/version", get(version))
@@ -270,10 +292,40 @@ pub fn create_router() -> Router {
         .route("/batch", post(batch_handler));
 
     #[cfg(feature = "swagger")]
-    let router = router
-        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()));
+    let router = if config.server.enable_swagger {
+        router.merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
+    } else {
+        router
+    };
 
-    router.layer(TraceLayer::new_for_http())
+    let cors = CorsLayer::new()
+        .allow_origin(tower_http::cors::AllowOrigin::list(
+            Vec::<HeaderValue>::new(),
+        ))
+        .allow_methods([axum::http::Method::GET, axum::http::Method::POST])
+        .allow_headers([header::CONTENT_TYPE]);
+
+    router
+        .layer(Extension(config_ext))
+        .layer(TraceLayer::new_for_http())
+        .layer(RequestBodyLimitLayer::new(config.server.max_body_size))
+        .layer(TimeoutLayer::with_status_code(
+            StatusCode::REQUEST_TIMEOUT,
+            Duration::from_secs(config.server.timeout_seconds),
+        ))
+        .layer(cors)
+        .layer(SetResponseHeaderLayer::overriding(
+            header::X_CONTENT_TYPE_OPTIONS,
+            HeaderValue::from_static("nosniff"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            header::X_FRAME_OPTIONS,
+            HeaderValue::from_static("DENY"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            header::CACHE_CONTROL,
+            HeaderValue::from_static("no-store"),
+        ))
 }
 
 #[cfg_attr(feature = "swagger", utoipa::path(
@@ -306,16 +358,19 @@ async fn version() -> Json<VersionResponse> {
 /// Helper function to format JSON responses with optional pretty printing
 fn json_response<T: Serialize>(value: T, pretty: bool, status: StatusCode) -> Response {
     let json_string = if pretty {
-        serde_json::to_string_pretty(&value).unwrap()
+        serde_json::to_string_pretty(&value)
     } else {
-        serde_json::to_string(&value).unwrap()
+        serde_json::to_string(&value)
     };
 
-    Response::builder()
-        .status(status)
-        .header(header::CONTENT_TYPE, "application/json")
-        .body(json_string.into())
-        .unwrap()
+    match json_string {
+        Ok(body) => build_response(status, "application/json", body),
+        Err(_) => build_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "application/json",
+            r#"{"error":"Internal serialization error"}"#.to_string(),
+        ),
+    }
 }
 
 #[cfg_attr(feature = "swagger", utoipa::path(
@@ -619,7 +674,10 @@ async fn contains_ipv6(Query(params): Query<ContainsQuery>) -> impl IntoResponse
     tag = "ipcalc"
 ))]
 #[instrument(skip_all, fields(cidrs = %params.cidrs))]
-async fn summarize_ipv4_handler(Query(params): Query<SummarizeQuery>) -> impl IntoResponse {
+async fn summarize_ipv4_handler(
+    Extension(config): Extension<Arc<ServerConfig>>,
+    Query(params): Query<SummarizeQuery>,
+) -> impl IntoResponse {
     info!("Summarizing IPv4 CIDRs");
     let cidrs: Vec<String> = params
         .cidrs
@@ -628,7 +686,7 @@ async fn summarize_ipv4_handler(Query(params): Query<SummarizeQuery>) -> impl In
         .filter(|s| !s.is_empty())
         .collect();
 
-    match summarize_ipv4(&cidrs) {
+    match summarize_ipv4_with_limit(&cidrs, config.max_summarize_inputs) {
         Ok(result) => {
             info!(
                 input = result.input_count,
@@ -663,7 +721,10 @@ async fn summarize_ipv4_handler(Query(params): Query<SummarizeQuery>) -> impl In
     tag = "ipcalc"
 ))]
 #[instrument(skip_all, fields(cidrs = %params.cidrs))]
-async fn summarize_ipv6_handler(Query(params): Query<SummarizeQuery>) -> impl IntoResponse {
+async fn summarize_ipv6_handler(
+    Extension(config): Extension<Arc<ServerConfig>>,
+    Query(params): Query<SummarizeQuery>,
+) -> impl IntoResponse {
     info!("Summarizing IPv6 CIDRs");
     let cidrs: Vec<String> = params
         .cidrs
@@ -672,7 +733,7 @@ async fn summarize_ipv6_handler(Query(params): Query<SummarizeQuery>) -> impl In
         .filter(|s| !s.is_empty())
         .collect();
 
-    match summarize_ipv6(&cidrs) {
+    match summarize_ipv6_with_limit(&cidrs, config.max_summarize_inputs) {
         Ok(result) => {
             info!(
                 input = result.input_count,
@@ -707,9 +768,12 @@ async fn summarize_ipv6_handler(Query(params): Query<SummarizeQuery>) -> impl In
     tag = "ipcalc"
 ))]
 #[instrument(skip_all, fields(start = %params.start, end = %params.end))]
-async fn from_range_ipv4_handler(Query(params): Query<FromRangeQuery>) -> impl IntoResponse {
+async fn from_range_ipv4_handler(
+    Extension(config): Extension<Arc<ServerConfig>>,
+    Query(params): Query<FromRangeQuery>,
+) -> impl IntoResponse {
     info!("Converting IPv4 range to CIDRs");
-    match from_range_ipv4(&params.start, &params.end) {
+    match from_range_ipv4_with_limit(&params.start, &params.end, config.max_generated_cidrs) {
         Ok(result) => {
             info!(cidr_count = result.cidr_count, "IPv4 from-range successful");
             format_response(result, params.format, params.pretty, StatusCode::OK)
@@ -740,9 +804,12 @@ async fn from_range_ipv4_handler(Query(params): Query<FromRangeQuery>) -> impl I
     tag = "ipcalc"
 ))]
 #[instrument(skip_all, fields(start = %params.start, end = %params.end))]
-async fn from_range_ipv6_handler(Query(params): Query<FromRangeQuery>) -> impl IntoResponse {
+async fn from_range_ipv6_handler(
+    Extension(config): Extension<Arc<ServerConfig>>,
+    Query(params): Query<FromRangeQuery>,
+) -> impl IntoResponse {
     info!("Converting IPv6 range to CIDRs");
-    match from_range_ipv6(&params.start, &params.end) {
+    match from_range_ipv6_with_limit(&params.start, &params.end, config.max_generated_cidrs) {
         Ok(result) => {
             info!(cidr_count = result.cidr_count, "IPv6 from-range successful");
             format_response(result, params.format, params.pretty, StatusCode::OK)
@@ -771,9 +838,12 @@ async fn from_range_ipv6_handler(Query(params): Query<FromRangeQuery>) -> impl I
     tag = "ipcalc"
 ))]
 #[instrument(skip_all, fields(count = params.cidrs.len()))]
-async fn batch_handler(Json(params): Json<BatchRequest>) -> impl IntoResponse {
+async fn batch_handler(
+    Extension(config): Extension<Arc<ServerConfig>>,
+    Json(params): Json<BatchRequest>,
+) -> impl IntoResponse {
     info!("Processing batch CIDRs");
-    match process_batch(&params.cidrs) {
+    match process_batch_with_limit(&params.cidrs, config.max_batch_size) {
         Ok(result) => {
             info!(count = result.count, "Batch processing successful");
             format_response(result, params.format, params.pretty, StatusCode::OK)

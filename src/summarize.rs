@@ -137,13 +137,25 @@ fn summarize_entries(entries: &mut Vec<(u128, u8)>, bits: u8) {
     merge_siblings(entries, bits);
 }
 
+pub const DEFAULT_MAX_SUMMARIZE_INPUTS: usize = 10_000;
+
 // ---------------------------------------------------------------------------
 // Public entry points
 // ---------------------------------------------------------------------------
 
 pub fn summarize_ipv4(cidrs: &[String]) -> Result<Ipv4SummaryResult> {
+    summarize_ipv4_with_limit(cidrs, DEFAULT_MAX_SUMMARIZE_INPUTS)
+}
+
+pub fn summarize_ipv4_with_limit(cidrs: &[String], max_inputs: usize) -> Result<Ipv4SummaryResult> {
     if cidrs.is_empty() {
         return Err(IpCalcError::EmptyCidrList);
+    }
+    if cidrs.len() > max_inputs {
+        return Err(IpCalcError::SummarizeInputLimitExceeded {
+            count: cidrs.len(),
+            limit: max_inputs,
+        });
     }
 
     let input_count = cidrs.len();
@@ -174,8 +186,18 @@ pub fn summarize_ipv4(cidrs: &[String]) -> Result<Ipv4SummaryResult> {
 }
 
 pub fn summarize_ipv6(cidrs: &[String]) -> Result<Ipv6SummaryResult> {
+    summarize_ipv6_with_limit(cidrs, DEFAULT_MAX_SUMMARIZE_INPUTS)
+}
+
+pub fn summarize_ipv6_with_limit(cidrs: &[String], max_inputs: usize) -> Result<Ipv6SummaryResult> {
     if cidrs.is_empty() {
         return Err(IpCalcError::EmptyCidrList);
+    }
+    if cidrs.len() > max_inputs {
+        return Err(IpCalcError::SummarizeInputLimitExceeded {
+            count: cidrs.len(),
+            limit: max_inputs,
+        });
     }
 
     let input_count = cidrs.len();
@@ -304,5 +326,14 @@ mod tests {
     fn test_empty_input() {
         let result = summarize_ipv4(&[]);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_summarize_input_limit_exceeded() {
+        let cidrs: Vec<String> = (0..5).map(|i| format!("10.{}.0.0/16", i)).collect();
+        let result = summarize_ipv4_with_limit(&cidrs, 3);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("exceeds maximum"));
     }
 }

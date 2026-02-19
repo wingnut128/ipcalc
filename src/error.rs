@@ -51,6 +51,21 @@ pub enum IpCalcError {
 
     #[error("Invalid range: start {0} is greater than end {1}")]
     InvalidRange(String, String),
+
+    #[error("Batch size {count} exceeds maximum of {limit}")]
+    BatchSizeExceeded { count: usize, limit: usize },
+
+    #[error("Generated CIDR count {count} exceeds maximum of {limit}")]
+    FromRangeLimitExceeded { count: usize, limit: usize },
+
+    #[error("Summarize input count {count} exceeds maximum of {limit}")]
+    SummarizeInputLimitExceeded { count: usize, limit: usize },
+
+    #[error("Input string exceeds maximum length of {limit} bytes")]
+    InputTooLong { length: usize, limit: usize },
+
+    #[error("Configuration parse error: {0}")]
+    ConfigParse(String),
 }
 
 pub type Result<T> = std::result::Result<T, IpCalcError>;

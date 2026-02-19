@@ -2,11 +2,11 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode, header};
 use axum::response::Response;
 use http_body_util::BodyExt;
-use ipcalc::api::create_router;
+use ipcalc::api::{RouterConfig, create_router};
 use tower::ServiceExt;
 
 async fn get(uri: &str) -> (StatusCode, String) {
-    let app = create_router();
+    let app = create_router(RouterConfig::default());
     let req = Request::builder().uri(uri).body(Body::empty()).unwrap();
     let resp: Response = app.oneshot(req).await.unwrap();
     let status = resp.status();
@@ -14,8 +14,36 @@ async fn get(uri: &str) -> (StatusCode, String) {
     (status, String::from_utf8(body.to_vec()).unwrap())
 }
 
+async fn get_with_headers(uri: &str) -> (StatusCode, String, axum::http::HeaderMap) {
+    let app = create_router(RouterConfig::default());
+    let req = Request::builder().uri(uri).body(Body::empty()).unwrap();
+    let resp: Response = app.oneshot(req).await.unwrap();
+    let status = resp.status();
+    let headers = resp.headers().clone();
+    let body = resp.into_body().collect().await.unwrap().to_bytes();
+    (status, String::from_utf8(body.to_vec()).unwrap(), headers)
+}
+
 async fn post_json(uri: &str, json_body: &str) -> (StatusCode, String) {
-    let app = create_router();
+    let app = create_router(RouterConfig::default());
+    let req = Request::builder()
+        .method("POST")
+        .uri(uri)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(json_body.to_string()))
+        .unwrap();
+    let resp: Response = app.oneshot(req).await.unwrap();
+    let status = resp.status();
+    let body = resp.into_body().collect().await.unwrap().to_bytes();
+    (status, String::from_utf8(body.to_vec()).unwrap())
+}
+
+async fn post_json_with_config(
+    uri: &str,
+    json_body: &str,
+    config: RouterConfig,
+) -> (StatusCode, String) {
+    let app = create_router(config);
     let req = Request::builder()
         .method("POST")
         .uri(uri)
@@ -328,4 +356,93 @@ async fn test_error_stays_json_with_yaml_format() {
     assert_eq!(status, 400);
     let json: serde_json::Value = serde_json::from_str(&body).unwrap();
     assert!(json["error"].is_string());
+}
+
+// ── Security Tests ──────────────────────────────────────────────────
+
+#[tokio::test]
+async fn test_security_headers_present() {
+    let (status, _body, headers) = get_with_headers("/health").await;
+    assert_eq!(status, 200);
+    assert_eq!(headers.get("x-content-type-options").unwrap(), "nosniff");
+    assert_eq!(headers.get("x-frame-options").unwrap(), "DENY");
+    assert_eq!(headers.get("cache-control").unwrap(), "no-store");
+}
+
+#[tokio::test]
+async fn test_batch_size_exceeded() {
+    use ipcalc::config::ServerConfig;
+    let config = RouterConfig {
+        server: ServerConfig {
+            max_batch_size: 2,
+            ..Default::default()
+        },
+    };
+
+    // 3 CIDRs with max_batch_size=2 should fail
+    let (status, body) = post_json_with_config(
+        "/batch",
+        r#"{"cidrs":["192.168.1.0/24","10.0.0.0/8","172.16.0.0/12"]}"#,
+        config,
+    )
+    .await;
+    assert_eq!(status, 400);
+    let json: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert!(json["error"].as_str().unwrap().contains("exceeds maximum"));
+}
+
+#[tokio::test]
+async fn test_swagger_disabled_by_default() {
+    let app = create_router(RouterConfig::default());
+    let req = Request::builder()
+        .uri("/swagger-ui")
+        .body(Body::empty())
+        .unwrap();
+    let resp: Response = app.oneshot(req).await.unwrap();
+    // Swagger should not be available (404) when enable_swagger is false
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn test_input_too_long_rejected() {
+    let long_cidr = "a".repeat(300);
+    let uri = format!("/v4?cidr={}", long_cidr);
+    let (status, body) = get(&uri).await;
+    assert_eq!(status, 400);
+    let json: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert!(
+        json["error"]
+            .as_str()
+            .unwrap()
+            .contains("exceeds maximum length")
+    );
+}
+
+#[tokio::test]
+async fn test_body_size_limit() {
+    use ipcalc::config::ServerConfig;
+    let config = RouterConfig {
+        server: ServerConfig {
+            max_body_size: 64,
+            ..Default::default()
+        },
+    };
+
+    let app = create_router(config);
+    // Send a body larger than 64 bytes
+    let large_body = format!(
+        r#"{{"cidrs":[{}]}}"#,
+        (0..20)
+            .map(|i| format!(r#""10.0.{}.0/24""#, i))
+            .collect::<Vec<_>>()
+            .join(",")
+    );
+    let req = Request::builder()
+        .method("POST")
+        .uri("/batch")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(large_body))
+        .unwrap();
+    let resp: Response = app.oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::PAYLOAD_TOO_LARGE);
 }

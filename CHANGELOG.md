@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- TOML config file support (`--config path`) for server settings
+- CLI flags for all configurable limits (`--max-batch-size`, `--max-range-cidrs`, `--max-summarize-inputs`, `--max-body-size`, `--rate-limit-per-second`, `--rate-limit-burst`, `--timeout`)
+- `--enable-swagger` flag to opt-in to Swagger UI (disabled by default)
 - CSV output format (`--format csv`, `?format=csv`) for spreadsheet-importable subnet data
 - YAML output format (`--format yaml`, `?format=yaml`) for IaC workflow integration
 - `format` query parameter on all API endpoints supporting `json`, `text`, `csv`, and `yaml`
@@ -18,6 +21,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Partial failure tolerance for invalid CIDRs in batch operations
 - Fuzz testing with `cargo-fuzz` and `libfuzzer-sys` for CIDR parsing, address containment, range conversion, and subnet operations
 - `make fuzz` target with configurable `FUZZ_TARGET` and `FUZZ_DURATION`
+
+### Security
+
+- Request body size limit (default 1 MB), configurable via `max_body_size`
+- Batch size cap (default 10K), from-range output cap (default 1M), summarize input cap (default 10K)
+- Per-IP rate limiting support via `tower_governor` (configurable burst/sustained)
+- Request timeout (default 30s), configurable via `timeout_seconds`
+- Security headers: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Cache-Control: no-store`
+- Restrictive CORS policy (no origins allowed by default)
+- Swagger UI disabled by default, opt-in via `--enable-swagger` flag
+- Graceful shutdown on SIGTERM/SIGINT
+- Response builder `.unwrap()` replaced with safe fallbacks
+- Bind-address warning when using non-loopback addresses
+- Input length validation (256 byte max) on CIDR parsing
+- Dockerfile HEALTHCHECK directive
 
 ### Changed
 
