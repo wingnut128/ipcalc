@@ -10,3 +10,7 @@ SPEC_TEMPLATE.md
 /.claude/
 fuzz/artifacts/
 fuzz/corpus/
+.vscode/
+
+# Snyk Security Extension - AI Rules (auto-generated)
+.github/instructions/snyk_rules.instructions.md
