@@ -70,7 +70,7 @@ ipcalc split 10.0.0.0/8 -p 16 -n 10   # Generate 10 /16 subnets
 ipcalc split 10.0.0.0/8 -p 16 --max   # Generate all possible /16 subnets
 ```
 
-Global options: `--format json|text`, `--output <file>`
+Global options: `--format json|text|csv|yaml`, `--output <file>`
 
 **Important**: Run `make setup` after cloning to install git hooks that enforce formatting and linting on commits.
 

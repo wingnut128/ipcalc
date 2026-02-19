@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- CSV output format (`--format csv`, `?format=csv`) for spreadsheet-importable subnet data
+- YAML output format (`--format yaml`, `?format=yaml`) for IaC workflow integration
+- `format` query parameter on all API endpoints supporting `json`, `text`, `csv`, and `yaml`
 - Batch CIDR processing via multiple positional arguments
 - `--stdin` flag for reading CIDRs from standard input
 - `POST /batch` API endpoint with mixed IPv4/IPv6 auto-detection

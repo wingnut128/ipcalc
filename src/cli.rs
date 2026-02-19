@@ -16,7 +16,7 @@ pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Commands>,
 
-    /// Output format (json or text)
+    /// Output format (json, text, csv, or yaml)
     #[arg(short, long, default_value = "json", global = true)]
     pub format: OutputFormatArg,
 
@@ -120,6 +120,8 @@ pub enum OutputFormatArg {
     #[default]
     Json,
     Text,
+    Csv,
+    Yaml,
 }
 
 impl From<OutputFormatArg> for crate::output::OutputFormat {
@@ -127,6 +129,8 @@ impl From<OutputFormatArg> for crate::output::OutputFormat {
         match arg {
             OutputFormatArg::Json => crate::output::OutputFormat::Json,
             OutputFormatArg::Text => crate::output::OutputFormat::Text,
+            OutputFormatArg::Csv => crate::output::OutputFormat::Csv,
+            OutputFormatArg::Yaml => crate::output::OutputFormat::Yaml,
         }
     }
 }

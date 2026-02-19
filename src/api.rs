@@ -19,11 +19,13 @@ use crate::batch::process_batch;
 #[cfg(feature = "swagger")]
 use crate::contains::ContainsResult;
 use crate::contains::{check_ipv4_contains, check_ipv6_contains};
+use crate::error::IpCalcError;
 #[cfg(feature = "swagger")]
 use crate::from_range::{Ipv4FromRangeResult, Ipv6FromRangeResult};
 use crate::from_range::{from_range_ipv4, from_range_ipv6};
 use crate::ipv4::Ipv4Subnet;
 use crate::ipv6::Ipv6Subnet;
+use crate::output::{CsvOutput, OutputFormat, TextOutput};
 #[cfg(feature = "swagger")]
 use crate::subnet_generator::{Ipv4SubnetList, Ipv6SubnetList, SplitSummary};
 use crate::subnet_generator::{count_subnets, generate_ipv4_subnets, generate_ipv6_subnets};
@@ -71,6 +73,9 @@ pub struct SubnetQuery {
     /// Pretty print JSON output
     #[serde(default)]
     pretty: bool,
+    /// Output format (json, text, csv, yaml)
+    #[serde(default)]
+    format: ApiOutputFormat,
 }
 
 #[derive(Deserialize)]
@@ -91,6 +96,9 @@ pub struct SplitQuery {
     /// Pretty print JSON output
     #[serde(default)]
     pretty: bool,
+    /// Output format (json, text, csv, yaml)
+    #[serde(default)]
+    format: ApiOutputFormat,
 }
 
 #[derive(Deserialize)]
@@ -103,6 +111,9 @@ pub struct ContainsQuery {
     /// Pretty print JSON output
     #[serde(default)]
     pretty: bool,
+    /// Output format (json, text, csv, yaml)
+    #[serde(default)]
+    format: ApiOutputFormat,
 }
 
 #[derive(Deserialize)]
@@ -113,6 +124,9 @@ pub struct SummarizeQuery {
     /// Pretty print JSON output
     #[serde(default)]
     pretty: bool,
+    /// Output format (json, text, csv, yaml)
+    #[serde(default)]
+    format: ApiOutputFormat,
 }
 
 #[derive(Deserialize)]
@@ -125,6 +139,9 @@ pub struct FromRangeQuery {
     /// Pretty print JSON output
     #[serde(default)]
     pretty: bool,
+    /// Output format (json, text, csv, yaml)
+    #[serde(default)]
+    format: ApiOutputFormat,
 }
 
 #[derive(Deserialize)]
@@ -135,6 +152,9 @@ pub struct BatchRequest {
     /// Pretty print JSON output
     #[serde(default)]
     pub pretty: bool,
+    /// Output format (json, text, csv, yaml)
+    #[serde(default)]
+    pub format: ApiOutputFormat,
 }
 
 #[derive(Serialize)]
@@ -151,6 +171,86 @@ struct VersionResponse {
     name: &'static str,
     /// Application version
     version: &'static str,
+}
+
+#[derive(Deserialize, Default, Clone, Copy)]
+#[cfg_attr(feature = "swagger", derive(utoipa::ToSchema))]
+#[serde(rename_all = "lowercase")]
+pub enum ApiOutputFormat {
+    #[default]
+    Json,
+    Text,
+    Csv,
+    Yaml,
+}
+
+impl From<ApiOutputFormat> for OutputFormat {
+    fn from(f: ApiOutputFormat) -> Self {
+        match f {
+            ApiOutputFormat::Json => OutputFormat::Json,
+            ApiOutputFormat::Text => OutputFormat::Text,
+            ApiOutputFormat::Csv => OutputFormat::Csv,
+            ApiOutputFormat::Yaml => OutputFormat::Yaml,
+        }
+    }
+}
+
+fn format_response<T: Serialize + TextOutput + CsvOutput>(
+    value: T,
+    format: ApiOutputFormat,
+    pretty: bool,
+    status: StatusCode,
+) -> Response {
+    match format {
+        ApiOutputFormat::Json => {
+            let body = if pretty {
+                serde_json::to_string_pretty(&value).unwrap()
+            } else {
+                serde_json::to_string(&value).unwrap()
+            };
+            Response::builder()
+                .status(status)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(body.into())
+                .unwrap()
+        }
+        ApiOutputFormat::Text => {
+            let body = value.to_text();
+            Response::builder()
+                .status(status)
+                .header(header::CONTENT_TYPE, "text/plain")
+                .body(body.into())
+                .unwrap()
+        }
+        ApiOutputFormat::Csv => match value.to_csv() {
+            Ok(body) => Response::builder()
+                .status(status)
+                .header(header::CONTENT_TYPE, "text/csv")
+                .body(body.into())
+                .unwrap(),
+            Err(e) => json_response(
+                ErrorResponse {
+                    error: e.to_string(),
+                },
+                false,
+                StatusCode::INTERNAL_SERVER_ERROR,
+            ),
+        },
+        ApiOutputFormat::Yaml => match serde_saphyr::to_string(&value) {
+            Ok(body) => Response::builder()
+                .status(status)
+                .header(header::CONTENT_TYPE, "application/yaml")
+                .body(body.into())
+                .unwrap(),
+            Err(e) => json_response(
+                ErrorResponse {
+                    error: IpCalcError::Yaml(e.to_string()).to_string(),
+                },
+                false,
+                StatusCode::INTERNAL_SERVER_ERROR,
+            ),
+        },
+    }
 }
 
 pub fn create_router() -> Router {
@@ -236,7 +336,7 @@ async fn calculate_ipv4(Query(params): Query<SubnetQuery>) -> impl IntoResponse 
     match Ipv4Subnet::from_cidr(&params.cidr) {
         Ok(subnet) => {
             info!(network = %subnet.network_address, "IPv4 calculation successful");
-            json_response(subnet, params.pretty, StatusCode::OK)
+            format_response(subnet, params.format, params.pretty, StatusCode::OK)
         }
         Err(e) => {
             warn!(error = %e, "IPv4 calculation failed");
@@ -269,7 +369,7 @@ async fn calculate_ipv6(Query(params): Query<SubnetQuery>) -> impl IntoResponse 
     match Ipv6Subnet::from_cidr(&params.cidr) {
         Ok(subnet) => {
             info!(network = %subnet.network_address, "IPv6 calculation successful");
-            json_response(subnet, params.pretty, StatusCode::OK)
+            format_response(subnet, params.format, params.pretty, StatusCode::OK)
         }
         Err(e) => {
             warn!(error = %e, "IPv6 calculation failed");
@@ -304,7 +404,7 @@ async fn split_ipv4(Query(params): Query<SplitQuery>) -> impl IntoResponse {
         return match count_subnets(&params.cidr, params.prefix) {
             Ok(summary) => {
                 info!(available = %summary.available_subnets, "IPv4 count-only successful");
-                json_response(summary, params.pretty, StatusCode::OK)
+                format_response(summary, params.format, params.pretty, StatusCode::OK)
             }
             Err(e) => {
                 warn!(error = %e, "IPv4 count-only failed");
@@ -344,7 +444,7 @@ async fn split_ipv4(Query(params): Query<SplitQuery>) -> impl IntoResponse {
                 subnets_generated = result.subnets.len(),
                 "IPv4 split successful"
             );
-            json_response(result, params.pretty, StatusCode::OK)
+            format_response(result, params.format, params.pretty, StatusCode::OK)
         }
         Err(e) => {
             warn!(error = %e, "IPv4 split failed");
@@ -379,7 +479,7 @@ async fn split_ipv6(Query(params): Query<SplitQuery>) -> impl IntoResponse {
         return match count_subnets(&params.cidr, params.prefix) {
             Ok(summary) => {
                 info!(available = %summary.available_subnets, "IPv6 count-only successful");
-                json_response(summary, params.pretty, StatusCode::OK)
+                format_response(summary, params.format, params.pretty, StatusCode::OK)
             }
             Err(e) => {
                 warn!(error = %e, "IPv6 count-only failed");
@@ -419,7 +519,7 @@ async fn split_ipv6(Query(params): Query<SplitQuery>) -> impl IntoResponse {
                 subnets_generated = result.subnets.len(),
                 "IPv6 split successful"
             );
-            json_response(result, params.pretty, StatusCode::OK)
+            format_response(result, params.format, params.pretty, StatusCode::OK)
         }
         Err(e) => {
             warn!(error = %e, "IPv6 split failed");
@@ -455,7 +555,7 @@ async fn contains_ipv4(Query(params): Query<ContainsQuery>) -> impl IntoResponse
                 contained = result.contained,
                 "IPv4 containment check successful"
             );
-            json_response(result, params.pretty, StatusCode::OK)
+            format_response(result, params.format, params.pretty, StatusCode::OK)
         }
         Err(e) => {
             warn!(error = %e, "IPv4 containment check failed");
@@ -491,7 +591,7 @@ async fn contains_ipv6(Query(params): Query<ContainsQuery>) -> impl IntoResponse
                 contained = result.contained,
                 "IPv6 containment check successful"
             );
-            json_response(result, params.pretty, StatusCode::OK)
+            format_response(result, params.format, params.pretty, StatusCode::OK)
         }
         Err(e) => {
             warn!(error = %e, "IPv6 containment check failed");
@@ -535,7 +635,7 @@ async fn summarize_ipv4_handler(Query(params): Query<SummarizeQuery>) -> impl In
                 output = result.output_count,
                 "IPv4 summarization successful"
             );
-            json_response(result, params.pretty, StatusCode::OK)
+            format_response(result, params.format, params.pretty, StatusCode::OK)
         }
         Err(e) => {
             warn!(error = %e, "IPv4 summarization failed");
@@ -579,7 +679,7 @@ async fn summarize_ipv6_handler(Query(params): Query<SummarizeQuery>) -> impl In
                 output = result.output_count,
                 "IPv6 summarization successful"
             );
-            json_response(result, params.pretty, StatusCode::OK)
+            format_response(result, params.format, params.pretty, StatusCode::OK)
         }
         Err(e) => {
             warn!(error = %e, "IPv6 summarization failed");
@@ -612,7 +712,7 @@ async fn from_range_ipv4_handler(Query(params): Query<FromRangeQuery>) -> impl I
     match from_range_ipv4(&params.start, &params.end) {
         Ok(result) => {
             info!(cidr_count = result.cidr_count, "IPv4 from-range successful");
-            json_response(result, params.pretty, StatusCode::OK)
+            format_response(result, params.format, params.pretty, StatusCode::OK)
         }
         Err(e) => {
             warn!(error = %e, "IPv4 from-range failed");
@@ -645,7 +745,7 @@ async fn from_range_ipv6_handler(Query(params): Query<FromRangeQuery>) -> impl I
     match from_range_ipv6(&params.start, &params.end) {
         Ok(result) => {
             info!(cidr_count = result.cidr_count, "IPv6 from-range successful");
-            json_response(result, params.pretty, StatusCode::OK)
+            format_response(result, params.format, params.pretty, StatusCode::OK)
         }
         Err(e) => {
             warn!(error = %e, "IPv6 from-range failed");
@@ -676,7 +776,7 @@ async fn batch_handler(Json(params): Json<BatchRequest>) -> impl IntoResponse {
     match process_batch(&params.cidrs) {
         Ok(result) => {
             info!(count = result.count, "Batch processing successful");
-            json_response(result, params.pretty, StatusCode::OK)
+            format_response(result, params.format, params.pretty, StatusCode::OK)
         }
         Err(e) => {
             warn!(error = %e, "Batch processing failed");

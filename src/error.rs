@@ -40,6 +40,12 @@ pub enum IpCalcError {
     #[error("JSON serialization error: {0}")]
     Json(#[from] serde_json::Error),
 
+    #[error("CSV serialization error: {0}")]
+    Csv(String),
+
+    #[error("YAML serialization error: {0}")]
+    Yaml(String),
+
     #[error("No CIDRs provided for summarization")]
     EmptyCidrList,
 
