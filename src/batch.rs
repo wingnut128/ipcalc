@@ -108,7 +108,9 @@ mod tests {
         assert_eq!(result.results[0].cidr, "192.168.1.0/24");
         match &result.results[0].result {
             BatchEntryResult::Ok { subnet } => match subnet.as_ref() {
-                SubnetResult::V4(s) => assert_eq!(s.network_address, "192.168.1.0"),
+                SubnetResult::V4(s) => {
+                    assert_eq!(s.network, std::net::Ipv4Addr::new(192, 168, 1, 0))
+                }
                 SubnetResult::V6(_) => panic!("expected v4"),
             },
             BatchEntryResult::Err { .. } => panic!("expected Ok"),
@@ -122,7 +124,12 @@ mod tests {
         assert_eq!(result.count, 1);
         match &result.results[0].result {
             BatchEntryResult::Ok { subnet } => match subnet.as_ref() {
-                SubnetResult::V6(s) => assert_eq!(s.network_address, "2001:db8::"),
+                SubnetResult::V6(s) => {
+                    assert_eq!(
+                        s.network,
+                        std::net::Ipv6Addr::from(0x2001_0db8_0000_0000_0000_0000_0000_0000u128)
+                    )
+                }
                 SubnetResult::V4(_) => panic!("expected v6"),
             },
             BatchEntryResult::Err { .. } => panic!("expected Ok"),
@@ -175,16 +182,25 @@ mod tests {
     fn test_batch_empty() {
         let cidrs: Vec<String> = vec![];
         let result = process_batch(&cidrs);
-        assert!(result.is_err());
+        assert!(
+            matches!(result, Err(IpCalcError::EmptyCidrList)),
+            "expected EmptyCidrList, got {:?}",
+            result
+        );
     }
 
     #[test]
     fn test_batch_size_exceeded() {
         let cidrs: Vec<String> = (0..5).map(|i| format!("10.0.{}.0/24", i)).collect();
         let result = process_batch_with_limit(&cidrs, 3);
-        assert!(result.is_err());
-        let err = result.unwrap_err().to_string();
-        assert!(err.contains("exceeds maximum"));
+        assert!(
+            matches!(
+                result,
+                Err(IpCalcError::BatchSizeExceeded { count: 5, limit: 3 })
+            ),
+            "expected BatchSizeExceeded, got {:?}",
+            result
+        );
     }
 
     #[test]

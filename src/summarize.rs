@@ -164,7 +164,7 @@ pub fn summarize_ipv4_with_limit(cidrs: &[String], max_inputs: usize) -> Result<
     let mut entries: Vec<(u128, u8)> = Vec::with_capacity(cidrs.len());
     for cidr in cidrs {
         let subnet = Ipv4Subnet::from_cidr(cidr)?;
-        let network_u32 = u32::from(subnet.network_addr());
+        let network_u32 = u32::from(subnet.network);
         entries.push((network_u32 as u128, subnet.prefix_length));
     }
 
@@ -205,7 +205,7 @@ pub fn summarize_ipv6_with_limit(cidrs: &[String], max_inputs: usize) -> Result<
     let mut entries: Vec<(u128, u8)> = Vec::with_capacity(cidrs.len());
     for cidr in cidrs {
         let subnet = Ipv6Subnet::from_cidr(cidr)?;
-        let network_u128 = u128::from(subnet.network_addr());
+        let network_u128 = u128::from(subnet.network);
         entries.push((network_u128, subnet.prefix_length));
     }
 
@@ -232,6 +232,8 @@ pub fn summarize_ipv6_with_limit(cidrs: &[String], max_inputs: usize) -> Result<
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::net::{Ipv4Addr, Ipv6Addr};
+    use std::str::FromStr;
 
     #[test]
     fn test_adjacent_merge_ipv4() {
@@ -239,7 +241,7 @@ mod tests {
             summarize_ipv4(&["192.168.0.0/24".to_string(), "192.168.1.0/24".to_string()]).unwrap();
         assert_eq!(result.input_count, 2);
         assert_eq!(result.output_count, 1);
-        assert_eq!(result.cidrs[0].network_address, "192.168.0.0");
+        assert_eq!(result.cidrs[0].network, Ipv4Addr::new(192, 168, 0, 0));
         assert_eq!(result.cidrs[0].prefix_length, 23);
     }
 
@@ -248,7 +250,7 @@ mod tests {
         let result =
             summarize_ipv4(&["10.0.0.0/8".to_string(), "10.1.0.0/16".to_string()]).unwrap();
         assert_eq!(result.output_count, 1);
-        assert_eq!(result.cidrs[0].network_address, "10.0.0.0");
+        assert_eq!(result.cidrs[0].network, Ipv4Addr::new(10, 0, 0, 0));
         assert_eq!(result.cidrs[0].prefix_length, 8);
     }
 
@@ -263,7 +265,7 @@ mod tests {
         ])
         .unwrap();
         assert_eq!(result.output_count, 1);
-        assert_eq!(result.cidrs[0].network_address, "10.0.0.0");
+        assert_eq!(result.cidrs[0].network, Ipv4Addr::new(10, 0, 0, 0));
         assert_eq!(result.cidrs[0].prefix_length, 22);
     }
 
@@ -272,7 +274,7 @@ mod tests {
         let result =
             summarize_ipv4(&["192.168.1.0/24".to_string(), "192.168.1.0/24".to_string()]).unwrap();
         assert_eq!(result.output_count, 1);
-        assert_eq!(result.cidrs[0].network_address, "192.168.1.0");
+        assert_eq!(result.cidrs[0].network, Ipv4Addr::new(192, 168, 1, 0));
         assert_eq!(result.cidrs[0].prefix_length, 24);
     }
 
@@ -281,7 +283,7 @@ mod tests {
         let result = summarize_ipv4(&["172.16.0.0/12".to_string()]).unwrap();
         assert_eq!(result.input_count, 1);
         assert_eq!(result.output_count, 1);
-        assert_eq!(result.cidrs[0].network_address, "172.16.0.0");
+        assert_eq!(result.cidrs[0].network, Ipv4Addr::new(172, 16, 0, 0));
         assert_eq!(result.cidrs[0].prefix_length, 12);
     }
 
@@ -294,7 +296,7 @@ mod tests {
         ])
         .unwrap();
         assert_eq!(result.output_count, 1);
-        assert_eq!(result.cidrs[0].network_address, "192.168.0.0");
+        assert_eq!(result.cidrs[0].network, Ipv4Addr::new(192, 168, 0, 0));
         assert_eq!(result.cidrs[0].prefix_length, 23);
     }
 
@@ -318,22 +320,34 @@ mod tests {
             summarize_ipv6(&["2001:db8::/48".to_string(), "2001:db8:1::/48".to_string()]).unwrap();
         assert_eq!(result.input_count, 2);
         assert_eq!(result.output_count, 1);
-        assert_eq!(result.cidrs[0].network_address, "2001:db8::");
+        assert_eq!(
+            result.cidrs[0].network,
+            Ipv6Addr::from_str("2001:db8::").unwrap()
+        );
         assert_eq!(result.cidrs[0].prefix_length, 47);
     }
 
     #[test]
     fn test_empty_input() {
         let result = summarize_ipv4(&[]);
-        assert!(result.is_err());
+        assert!(
+            matches!(result, Err(IpCalcError::EmptyCidrList)),
+            "expected EmptyCidrList, got {:?}",
+            result
+        );
     }
 
     #[test]
     fn test_summarize_input_limit_exceeded() {
         let cidrs: Vec<String> = (0..5).map(|i| format!("10.{}.0.0/16", i)).collect();
         let result = summarize_ipv4_with_limit(&cidrs, 3);
-        assert!(result.is_err());
-        let err = result.unwrap_err().to_string();
-        assert!(err.contains("exceeds maximum"));
+        assert!(
+            matches!(
+                result,
+                Err(IpCalcError::SummarizeInputLimitExceeded { count: 5, limit: 3 })
+            ),
+            "expected SummarizeInputLimitExceeded, got {:?}",
+            result
+        );
     }
 }

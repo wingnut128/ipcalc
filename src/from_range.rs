@@ -200,7 +200,7 @@ mod tests {
     fn test_single_address_v4() {
         let result = from_range_ipv4("192.168.1.1", "192.168.1.1").unwrap();
         assert_eq!(result.cidr_count, 1);
-        assert_eq!(result.cidrs[0].network_address, "192.168.1.1");
+        assert_eq!(result.cidrs[0].network, Ipv4Addr::new(192, 168, 1, 1));
         assert_eq!(result.cidrs[0].prefix_length, 32);
     }
 
@@ -208,7 +208,7 @@ mod tests {
     fn test_two_addresses_v4() {
         let result = from_range_ipv4("192.168.1.0", "192.168.1.1").unwrap();
         assert_eq!(result.cidr_count, 1);
-        assert_eq!(result.cidrs[0].network_address, "192.168.1.0");
+        assert_eq!(result.cidrs[0].network, Ipv4Addr::new(192, 168, 1, 0));
         assert_eq!(result.cidrs[0].prefix_length, 31);
     }
 
@@ -216,7 +216,7 @@ mod tests {
     fn test_full_subnet_v4() {
         let result = from_range_ipv4("10.0.0.0", "10.0.0.255").unwrap();
         assert_eq!(result.cidr_count, 1);
-        assert_eq!(result.cidrs[0].network_address, "10.0.0.0");
+        assert_eq!(result.cidrs[0].network, Ipv4Addr::new(10, 0, 0, 0));
         assert_eq!(result.cidrs[0].prefix_length, 24);
     }
 
@@ -226,22 +226,30 @@ mod tests {
         let result = from_range_ipv4("192.168.1.10", "192.168.1.20").unwrap();
         assert!(result.cidr_count > 1);
         // Verify coverage: first starts at .10, last ends at .20
-        assert_eq!(result.cidrs[0].network_address, "192.168.1.10");
+        assert_eq!(result.cidrs[0].network, Ipv4Addr::new(192, 168, 1, 10));
         let last = result.cidrs.last().unwrap();
         // Last CIDR should end at .20
-        assert_eq!(last.broadcast_address, "192.168.1.20");
+        assert_eq!(last.broadcast, Ipv4Addr::new(192, 168, 1, 20));
     }
 
     #[test]
     fn test_start_greater_than_end_v4() {
         let result = from_range_ipv4("192.168.1.20", "192.168.1.10");
-        assert!(result.is_err());
+        assert!(
+            matches!(result, Err(IpCalcError::InvalidRange(_, _))),
+            "expected InvalidRange, got {:?}",
+            result
+        );
     }
 
     #[test]
     fn test_invalid_address_v4() {
         let result = from_range_ipv4("not-an-ip", "192.168.1.10");
-        assert!(result.is_err());
+        assert!(
+            matches!(result, Err(IpCalcError::InvalidIpv4Address(_))),
+            "expected InvalidIpv4Address, got {:?}",
+            result
+        );
     }
 
     #[test]
@@ -269,7 +277,11 @@ mod tests {
     #[test]
     fn test_start_greater_than_end_v6() {
         let result = from_range_ipv6("2001:db8::ff", "2001:db8::1");
-        assert!(result.is_err());
+        assert!(
+            matches!(result, Err(IpCalcError::InvalidRange(_, _))),
+            "expected InvalidRange, got {:?}",
+            result
+        );
     }
 
     #[test]
@@ -284,9 +296,14 @@ mod tests {
     fn test_from_range_limit_exceeded_v4() {
         // A range that generates many CIDRs, limited to 2
         let result = from_range_ipv4_with_limit("192.168.1.1", "192.168.1.20", 2);
-        assert!(result.is_err());
-        let err = result.unwrap_err().to_string();
-        assert!(err.contains("exceeds maximum"));
+        assert!(
+            matches!(
+                result,
+                Err(IpCalcError::FromRangeLimitExceeded { limit: 2, .. })
+            ),
+            "expected FromRangeLimitExceeded, got {:?}",
+            result
+        );
     }
 
     #[test]
@@ -295,7 +312,7 @@ mod tests {
         let result = from_range_ipv4("10.0.0.5", "10.0.0.130").unwrap();
         let mut expected_next: u64 = u32::from(Ipv4Addr::from_str("10.0.0.5").unwrap()) as u64;
         for cidr in &result.cidrs {
-            let net = u32::from(Ipv4Addr::from_str(&cidr.network_address).unwrap()) as u64;
+            let net = u32::from(cidr.network) as u64;
             assert_eq!(net, expected_next, "Gap in CIDR coverage");
             expected_next = net + cidr.total_hosts;
         }

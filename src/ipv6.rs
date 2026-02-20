@@ -7,9 +7,13 @@ use std::str::FromStr;
 #[cfg_attr(feature = "swagger", derive(utoipa::ToSchema))]
 pub struct Ipv6Subnet {
     pub input: String,
-    pub network_address: String,
+    #[serde(rename = "network_address")]
+    #[cfg_attr(feature = "swagger", schema(value_type = String))]
+    pub network: Ipv6Addr,
     pub network_address_full: String,
-    pub last_address: String,
+    #[serde(rename = "last_address")]
+    #[cfg_attr(feature = "swagger", schema(value_type = String))]
+    pub last: Ipv6Addr,
     pub last_address_full: String,
     pub prefix_length: u8,
     pub total_addresses: String,
@@ -27,15 +31,14 @@ impl Ipv6Subnet {
                 limit: MAX_INPUT_LENGTH,
             });
         }
-        let parts: Vec<&str> = cidr.split('/').collect();
-        if parts.len() != 2 {
-            return Err(IpCalcError::InvalidCidr(cidr.to_string()));
-        }
+        let (addr_str, prefix_str) = cidr
+            .split_once('/')
+            .ok_or_else(|| IpCalcError::InvalidCidr(cidr.to_string()))?;
 
-        let addr = Ipv6Addr::from_str(parts[0])
-            .map_err(|_| IpCalcError::InvalidIpv6Address(parts[0].to_string()))?;
+        let addr = Ipv6Addr::from_str(addr_str)
+            .map_err(|_| IpCalcError::InvalidIpv6Address(addr_str.to_string()))?;
 
-        let prefix: u8 = parts[1]
+        let prefix: u8 = prefix_str
             .parse()
             .map_err(|_| IpCalcError::InvalidCidr(cidr.to_string()))?;
 
@@ -78,9 +81,9 @@ impl Ipv6Subnet {
 
         Ok(Self {
             input: format!("{}/{}", addr, prefix),
-            network_address: network_addr.to_string(),
+            network: network_addr,
             network_address_full: hextets.join(":"),
-            last_address: last_addr.to_string(),
+            last: last_addr,
             last_address_full: Self::format_full(&last_addr),
             prefix_length: prefix,
             total_addresses,
@@ -90,11 +93,11 @@ impl Ipv6Subnet {
     }
 
     fn format_full(addr: &Ipv6Addr) -> String {
-        addr.segments()
-            .iter()
-            .map(|s| format!("{:04x}", s))
-            .collect::<Vec<_>>()
-            .join(":")
+        let s = addr.segments();
+        format!(
+            "{:04x}:{:04x}:{:04x}:{:04x}:{:04x}:{:04x}:{:04x}:{:04x}",
+            s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7]
+        )
     }
 
     fn determine_address_type(addr: &Ipv6Addr) -> String {
@@ -136,10 +139,6 @@ impl Ipv6Subnet {
         let segments = addr.segments();
         (segments[0] & 0xe000) == 0x2000
     }
-
-    pub fn network_addr(&self) -> Ipv6Addr {
-        Ipv6Addr::from_str(&self.network_address).unwrap()
-    }
 }
 
 #[cfg(test)]
@@ -149,7 +148,10 @@ mod tests {
     #[test]
     fn test_ipv6_subnet_64() {
         let subnet = Ipv6Subnet::from_cidr("2001:db8:85a3::8a2e:370:7334/64").unwrap();
-        assert_eq!(subnet.network_address, "2001:db8:85a3::");
+        assert_eq!(
+            subnet.network,
+            Ipv6Addr::from_str("2001:db8:85a3::").unwrap()
+        );
         assert_eq!(
             subnet.network_address_full,
             "2001:0db8:85a3:0000:0000:0000:0000:0000"
@@ -161,7 +163,7 @@ mod tests {
     #[test]
     fn test_ipv6_subnet_128() {
         let subnet = Ipv6Subnet::from_cidr("::1/128").unwrap();
-        assert_eq!(subnet.network_address, "::1");
+        assert_eq!(subnet.network, Ipv6Addr::from_str("::1").unwrap());
         assert_eq!(subnet.total_addresses, "1");
         assert_eq!(subnet.address_type, "Loopback (RFC 4291)");
     }
@@ -193,15 +195,49 @@ mod tests {
     #[test]
     fn test_invalid_prefix() {
         let result = Ipv6Subnet::from_cidr("2001:db8::/129");
-        assert!(result.is_err());
+        assert!(
+            matches!(result, Err(IpCalcError::InvalidPrefixLength(129))),
+            "expected InvalidPrefixLength(129), got {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_invalid_cidr_no_slash() {
+        let result = Ipv6Subnet::from_cidr("2001:db8::");
+        assert!(
+            matches!(result, Err(IpCalcError::InvalidCidr(_))),
+            "expected InvalidCidr, got {:?}",
+            result
+        );
     }
 
     #[test]
     fn test_input_too_long() {
         let long_input = "a".repeat(300);
         let result = Ipv6Subnet::from_cidr(&long_input);
-        assert!(result.is_err());
-        let err = result.unwrap_err().to_string();
-        assert!(err.contains("exceeds maximum length"));
+        assert!(
+            matches!(
+                result,
+                Err(IpCalcError::InputTooLong {
+                    length: 300,
+                    limit: 256
+                })
+            ),
+            "expected InputTooLong, got {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_json_serialization_field_names() {
+        let subnet = Ipv6Subnet::from_cidr("2001:db8::/32").unwrap();
+        let json: serde_json::Value = serde_json::to_value(&subnet).unwrap();
+        // Verify serde(rename) produces the expected JSON keys
+        assert_eq!(json["network_address"], "2001:db8::");
+        assert!(json["network_address_full"].is_string());
+        assert!(json["last_address"].is_string());
+        assert!(json["last_address_full"].is_string());
+        assert_eq!(json["prefix_length"], 32);
     }
 }

@@ -127,7 +127,7 @@ pub fn generate_ipv4_subnets(
         });
     }
 
-    let network_u32 = u32::from(supernet.network_addr());
+    let network_u32 = u32::from(supernet.network);
     let subnet_size = 2u32.pow((32 - new_prefix) as u32);
 
     let subnets: Result<Vec<Ipv4Subnet>> = (0..actual_count)
@@ -198,7 +198,7 @@ pub fn generate_ipv6_subnets(
         });
     }
 
-    let network_u128 = u128::from(supernet.network_addr());
+    let network_u128 = u128::from(supernet.network);
     let subnet_size: u128 = if new_prefix == 128 {
         1
     } else {
@@ -229,10 +229,10 @@ mod tests {
     fn test_generate_ipv4_subnets() {
         let result = generate_ipv4_subnets("192.168.0.0/22", 27, Some(10)).unwrap();
         assert_eq!(result.subnets.len(), 10);
-        assert_eq!(result.subnets[0].network_address, "192.168.0.0");
+        assert_eq!(result.subnets[0].network, Ipv4Addr::new(192, 168, 0, 0));
         assert_eq!(result.subnets[0].prefix_length, 27);
-        assert_eq!(result.subnets[1].network_address, "192.168.0.32");
-        assert_eq!(result.subnets[9].network_address, "192.168.1.32");
+        assert_eq!(result.subnets[1].network, Ipv4Addr::new(192, 168, 0, 32));
+        assert_eq!(result.subnets[9].network, Ipv4Addr::new(192, 168, 1, 32));
     }
 
     #[test]
@@ -254,7 +254,18 @@ mod tests {
     fn test_generate_ipv4_subnets_too_many() {
         // /22 can only fit 32 /27 subnets
         let result = generate_ipv4_subnets("192.168.0.0/22", 27, Some(33));
-        assert!(result.is_err());
+        assert!(
+            matches!(
+                result,
+                Err(IpCalcError::InsufficientSubnets {
+                    requested: 33,
+                    available: 32,
+                    ..
+                })
+            ),
+            "expected InsufficientSubnets, got {:?}",
+            result
+        );
     }
 
     #[test]
@@ -275,6 +286,16 @@ mod tests {
     #[test]
     fn test_invalid_new_prefix_smaller() {
         let result = generate_ipv4_subnets("192.168.0.0/24", 22, Some(1));
-        assert!(result.is_err());
+        assert!(
+            matches!(
+                result,
+                Err(IpCalcError::InvalidSubnetSplit {
+                    new_prefix: 22,
+                    original_prefix: 24,
+                })
+            ),
+            "expected InvalidSubnetSplit, got {:?}",
+            result
+        );
     }
 }

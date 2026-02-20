@@ -7,13 +7,23 @@ use std::str::FromStr;
 #[cfg_attr(feature = "swagger", derive(utoipa::ToSchema))]
 pub struct Ipv4Subnet {
     pub input: String,
-    pub network_address: String,
-    pub broadcast_address: String,
-    pub subnet_mask: String,
-    pub wildcard_mask: String,
+    #[serde(rename = "network_address")]
+    #[cfg_attr(feature = "swagger", schema(value_type = String))]
+    pub network: Ipv4Addr,
+    #[serde(rename = "broadcast_address")]
+    #[cfg_attr(feature = "swagger", schema(value_type = String))]
+    pub broadcast: Ipv4Addr,
+    #[serde(rename = "subnet_mask")]
+    #[cfg_attr(feature = "swagger", schema(value_type = String))]
+    pub mask: Ipv4Addr,
+    #[serde(rename = "wildcard_mask")]
+    #[cfg_attr(feature = "swagger", schema(value_type = String))]
+    pub wildcard: Ipv4Addr,
     pub prefix_length: u8,
-    pub first_host: String,
-    pub last_host: String,
+    #[cfg_attr(feature = "swagger", schema(value_type = String))]
+    pub first_host: Ipv4Addr,
+    #[cfg_attr(feature = "swagger", schema(value_type = String))]
+    pub last_host: Ipv4Addr,
     pub total_hosts: u64,
     pub usable_hosts: u64,
     pub network_class: String,
@@ -31,15 +41,14 @@ impl Ipv4Subnet {
                 limit: MAX_INPUT_LENGTH,
             });
         }
-        let parts: Vec<&str> = cidr.split('/').collect();
-        if parts.len() != 2 {
-            return Err(IpCalcError::InvalidCidr(cidr.to_string()));
-        }
+        let (addr_str, prefix_str) = cidr
+            .split_once('/')
+            .ok_or_else(|| IpCalcError::InvalidCidr(cidr.to_string()))?;
 
-        let addr = Ipv4Addr::from_str(parts[0])
-            .map_err(|_| IpCalcError::InvalidIpv4Address(parts[0].to_string()))?;
+        let addr = Ipv4Addr::from_str(addr_str)
+            .map_err(|_| IpCalcError::InvalidIpv4Address(addr_str.to_string()))?;
 
-        let prefix: u8 = parts[1]
+        let prefix: u8 = prefix_str
             .parse()
             .map_err(|_| IpCalcError::InvalidCidr(cidr.to_string()))?;
 
@@ -57,15 +66,15 @@ impl Ipv4Subnet {
         } else {
             !0u32 << (32 - prefix)
         };
-        let wildcard = !mask;
+        let wildcard_val = !mask;
 
         let network = addr_u32 & mask;
-        let broadcast = network | wildcard;
+        let broadcast = network | wildcard_val;
 
         let network_addr = Ipv4Addr::from(network);
         let broadcast_addr = Ipv4Addr::from(broadcast);
         let subnet_mask = Ipv4Addr::from(mask);
-        let wildcard_mask = Ipv4Addr::from(wildcard);
+        let wildcard_mask = Ipv4Addr::from(wildcard_val);
 
         let total_hosts = if prefix == 32 {
             1
@@ -103,23 +112,19 @@ impl Ipv4Subnet {
 
         Ok(Self {
             input: format!("{}/{}", addr, prefix),
-            network_address: network_addr.to_string(),
-            broadcast_address: broadcast_addr.to_string(),
-            subnet_mask: subnet_mask.to_string(),
-            wildcard_mask: wildcard_mask.to_string(),
+            network: network_addr,
+            broadcast: broadcast_addr,
+            mask: subnet_mask,
+            wildcard: wildcard_mask,
             prefix_length: prefix,
-            first_host: first_host.to_string(),
-            last_host: last_host.to_string(),
+            first_host,
+            last_host,
             total_hosts,
             usable_hosts,
             network_class,
             is_private,
             address_type,
         })
-    }
-
-    pub fn network_addr(&self) -> Ipv4Addr {
-        Ipv4Addr::from_str(&self.network_address).unwrap()
     }
 
     fn determine_address_type(network: u32) -> String {
@@ -183,12 +188,12 @@ mod tests {
     #[test]
     fn test_ipv4_subnet_24() {
         let subnet = Ipv4Subnet::from_cidr("192.168.1.100/24").unwrap();
-        assert_eq!(subnet.network_address, "192.168.1.0");
-        assert_eq!(subnet.broadcast_address, "192.168.1.255");
-        assert_eq!(subnet.subnet_mask, "255.255.255.0");
-        assert_eq!(subnet.wildcard_mask, "0.0.0.255");
-        assert_eq!(subnet.first_host, "192.168.1.1");
-        assert_eq!(subnet.last_host, "192.168.1.254");
+        assert_eq!(subnet.network, Ipv4Addr::new(192, 168, 1, 0));
+        assert_eq!(subnet.broadcast, Ipv4Addr::new(192, 168, 1, 255));
+        assert_eq!(subnet.mask, Ipv4Addr::new(255, 255, 255, 0));
+        assert_eq!(subnet.wildcard, Ipv4Addr::new(0, 0, 0, 255));
+        assert_eq!(subnet.first_host, Ipv4Addr::new(192, 168, 1, 1));
+        assert_eq!(subnet.last_host, Ipv4Addr::new(192, 168, 1, 254));
         assert_eq!(subnet.total_hosts, 256);
         assert_eq!(subnet.usable_hosts, 254);
     }
@@ -196,8 +201,8 @@ mod tests {
     #[test]
     fn test_ipv4_subnet_32() {
         let subnet = Ipv4Subnet::from_cidr("10.0.0.1/32").unwrap();
-        assert_eq!(subnet.network_address, "10.0.0.1");
-        assert_eq!(subnet.broadcast_address, "10.0.0.1");
+        assert_eq!(subnet.network, Ipv4Addr::new(10, 0, 0, 1));
+        assert_eq!(subnet.broadcast, Ipv4Addr::new(10, 0, 0, 1));
         assert_eq!(subnet.total_hosts, 1);
         assert_eq!(subnet.usable_hosts, 1);
     }
@@ -205,8 +210,8 @@ mod tests {
     #[test]
     fn test_ipv4_subnet_31() {
         let subnet = Ipv4Subnet::from_cidr("10.0.0.0/31").unwrap();
-        assert_eq!(subnet.network_address, "10.0.0.0");
-        assert_eq!(subnet.broadcast_address, "10.0.0.1");
+        assert_eq!(subnet.network, Ipv4Addr::new(10, 0, 0, 0));
+        assert_eq!(subnet.broadcast, Ipv4Addr::new(10, 0, 0, 1));
         assert_eq!(subnet.total_hosts, 2);
         assert_eq!(subnet.usable_hosts, 2);
     }
@@ -223,16 +228,38 @@ mod tests {
     #[test]
     fn test_invalid_prefix() {
         let result = Ipv4Subnet::from_cidr("192.168.1.0/33");
-        assert!(result.is_err());
+        assert!(
+            matches!(result, Err(IpCalcError::InvalidPrefixLength(33))),
+            "expected InvalidPrefixLength(33), got {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_invalid_cidr_no_slash() {
+        let result = Ipv4Subnet::from_cidr("192.168.1.0");
+        assert!(
+            matches!(result, Err(IpCalcError::InvalidCidr(_))),
+            "expected InvalidCidr, got {:?}",
+            result
+        );
     }
 
     #[test]
     fn test_input_too_long() {
         let long_input = "a".repeat(300);
         let result = Ipv4Subnet::from_cidr(&long_input);
-        assert!(result.is_err());
-        let err = result.unwrap_err().to_string();
-        assert!(err.contains("exceeds maximum length"));
+        assert!(
+            matches!(
+                result,
+                Err(IpCalcError::InputTooLong {
+                    length: 300,
+                    limit: 256
+                })
+            ),
+            "expected InputTooLong, got {:?}",
+            result
+        );
     }
 
     #[test]
@@ -265,5 +292,19 @@ mod tests {
                 cidr, subnet.address_type, expected
             );
         }
+    }
+
+    #[test]
+    fn test_json_serialization_field_names() {
+        let subnet = Ipv4Subnet::from_cidr("192.168.1.0/24").unwrap();
+        let json: serde_json::Value = serde_json::to_value(&subnet).unwrap();
+        // Verify serde(rename) produces the expected JSON keys
+        assert_eq!(json["network_address"], "192.168.1.0");
+        assert_eq!(json["broadcast_address"], "192.168.1.255");
+        assert_eq!(json["subnet_mask"], "255.255.255.0");
+        assert_eq!(json["wildcard_mask"], "0.0.0.255");
+        assert_eq!(json["first_host"], "192.168.1.1");
+        assert_eq!(json["last_host"], "192.168.1.254");
+        assert_eq!(json["prefix_length"], 24);
     }
 }

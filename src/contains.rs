@@ -22,7 +22,7 @@ pub fn check_ipv4_contains(cidr: &str, address: &str) -> Result<ContainsResult> 
         .map_err(|_| IpCalcError::InvalidIpv4Address(address.to_string()))?;
 
     let addr_u32 = u32::from(addr);
-    let network_u32 = u32::from(subnet.network_addr());
+    let network_u32 = u32::from(subnet.network);
     let mask = if subnet.prefix_length == 0 {
         0
     } else {
@@ -32,11 +32,11 @@ pub fn check_ipv4_contains(cidr: &str, address: &str) -> Result<ContainsResult> 
     let contained = (addr_u32 & mask) == (network_u32 & mask);
 
     Ok(ContainsResult {
-        cidr: format!("{}/{}", subnet.network_address, subnet.prefix_length),
+        cidr: format!("{}/{}", subnet.network, subnet.prefix_length),
         address: address.to_string(),
         contained,
-        network_address: subnet.network_address,
-        broadcast_address: subnet.broadcast_address,
+        network_address: subnet.network.to_string(),
+        broadcast_address: subnet.broadcast.to_string(),
     })
 }
 
@@ -47,7 +47,7 @@ pub fn check_ipv6_contains(cidr: &str, address: &str) -> Result<ContainsResult> 
         .map_err(|_| IpCalcError::InvalidIpv6Address(address.to_string()))?;
 
     let addr_u128 = u128::from(addr);
-    let network_u128 = u128::from(subnet.network_addr());
+    let network_u128 = u128::from(subnet.network);
     let mask = if subnet.prefix_length == 0 {
         0
     } else {
@@ -57,11 +57,11 @@ pub fn check_ipv6_contains(cidr: &str, address: &str) -> Result<ContainsResult> 
     let contained = (addr_u128 & mask) == (network_u128 & mask);
 
     Ok(ContainsResult {
-        cidr: format!("{}/{}", subnet.network_address, subnet.prefix_length),
+        cidr: format!("{}/{}", subnet.network, subnet.prefix_length),
         address: address.to_string(),
         contained,
-        network_address: subnet.network_address,
-        broadcast_address: subnet.last_address,
+        network_address: subnet.network.to_string(),
+        broadcast_address: subnet.last.to_string(),
     })
 }
 
@@ -113,12 +113,20 @@ mod tests {
     #[test]
     fn test_invalid_ipv4_address() {
         let result = check_ipv4_contains("192.168.1.0/24", "not-an-ip");
-        assert!(result.is_err());
+        assert!(
+            matches!(result, Err(IpCalcError::InvalidIpv4Address(ref s)) if s == "not-an-ip"),
+            "expected InvalidIpv4Address, got {:?}",
+            result
+        );
     }
 
     #[test]
     fn test_invalid_ipv6_address() {
         let result = check_ipv6_contains("2001:db8::/32", "not-an-ip");
-        assert!(result.is_err());
+        assert!(
+            matches!(result, Err(IpCalcError::InvalidIpv6Address(ref s)) if s == "not-an-ip"),
+            "expected InvalidIpv6Address, got {:?}",
+            result
+        );
     }
 }

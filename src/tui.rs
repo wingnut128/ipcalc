@@ -423,7 +423,7 @@ fn render_split_results(f: &mut Frame, app: &AppState, area: Rect) {
         match generate_ipv6_subnets(&app.cidr_input, prefix, count) {
             Ok(result) => {
                 let mut lines = vec![
-                    format!("Supernet: {}", result.supernet.network_address),
+                    format!("Supernet: {}", result.supernet.network),
                     format!("New Prefix: /{}", result.new_prefix),
                     format!("Generated: {} subnets", result.requested_count),
                     String::from(""),
@@ -446,7 +446,7 @@ fn render_split_results(f: &mut Frame, app: &AppState, area: Rect) {
                     lines.push(format!(
                         "  {}: {}/{}",
                         i + 1,
-                        subnet.network_address,
+                        subnet.network,
                         subnet.prefix_length
                     ));
                 }
@@ -469,7 +469,7 @@ fn render_split_results(f: &mut Frame, app: &AppState, area: Rect) {
         match generate_ipv4_subnets(&app.cidr_input, prefix, count) {
             Ok(result) => {
                 let mut lines = vec![
-                    format!("Supernet: {}", result.supernet.network_address),
+                    format!("Supernet: {}", result.supernet.network),
                     format!("New Prefix: /{}", result.new_prefix),
                     format!("Generated: {} subnets", result.requested_count),
                     String::from(""),
@@ -492,7 +492,7 @@ fn render_split_results(f: &mut Frame, app: &AppState, area: Rect) {
                     lines.push(format!(
                         "  {}: {}/{}",
                         i + 1,
-                        subnet.network_address,
+                        subnet.network,
                         subnet.prefix_length
                     ));
                 }
