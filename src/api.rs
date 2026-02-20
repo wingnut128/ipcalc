@@ -390,7 +390,7 @@ async fn calculate_ipv4(Query(params): Query<SubnetQuery>) -> impl IntoResponse 
     info!("Calculating IPv4 subnet");
     match Ipv4Subnet::from_cidr(&params.cidr) {
         Ok(subnet) => {
-            info!(network = %subnet.network_address, "IPv4 calculation successful");
+            info!(network = %subnet.network, "IPv4 calculation successful");
             format_response(subnet, params.format, params.pretty, StatusCode::OK)
         }
         Err(e) => {
@@ -423,7 +423,7 @@ async fn calculate_ipv6(Query(params): Query<SubnetQuery>) -> impl IntoResponse 
     info!("Calculating IPv6 subnet");
     match Ipv6Subnet::from_cidr(&params.cidr) {
         Ok(subnet) => {
-            info!(network = %subnet.network_address, "IPv6 calculation successful");
+            info!(network = %subnet.network, "IPv6 calculation successful");
             format_response(subnet, params.format, params.pretty, StatusCode::OK)
         }
         Err(e) => {

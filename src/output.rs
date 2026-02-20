@@ -82,10 +82,10 @@ impl TextOutput for Ipv4Subnet {
         writeln!(out, "IPv4 Subnet Calculator").unwrap();
         writeln!(out, "======================").unwrap();
         writeln!(out, "Input:             {}", self.input).unwrap();
-        writeln!(out, "Network Address:   {}", self.network_address).unwrap();
-        writeln!(out, "Broadcast Address: {}", self.broadcast_address).unwrap();
-        writeln!(out, "Subnet Mask:       {}", self.subnet_mask).unwrap();
-        writeln!(out, "Wildcard Mask:     {}", self.wildcard_mask).unwrap();
+        writeln!(out, "Network Address:   {}", self.network).unwrap();
+        writeln!(out, "Broadcast Address: {}", self.broadcast).unwrap();
+        writeln!(out, "Subnet Mask:       {}", self.mask).unwrap();
+        writeln!(out, "Wildcard Mask:     {}", self.wildcard).unwrap();
         writeln!(out, "Prefix Length:     /{}", self.prefix_length).unwrap();
         writeln!(out, "First Host:        {}", self.first_host).unwrap();
         writeln!(out, "Last Host:         {}", self.last_host).unwrap();
@@ -109,9 +109,9 @@ impl TextOutput for Ipv6Subnet {
         writeln!(out, "IPv6 Subnet Calculator").unwrap();
         writeln!(out, "======================").unwrap();
         writeln!(out, "Input:               {}", self.input).unwrap();
-        writeln!(out, "Network Address:     {}", self.network_address).unwrap();
+        writeln!(out, "Network Address:     {}", self.network).unwrap();
         writeln!(out, "Network (Full):      {}", self.network_address_full).unwrap();
-        writeln!(out, "Last Address:        {}", self.last_address).unwrap();
+        writeln!(out, "Last Address:        {}", self.last).unwrap();
         writeln!(out, "Last Address (Full): {}", self.last_address_full).unwrap();
         writeln!(out, "Prefix Length:       /{}", self.prefix_length).unwrap();
         writeln!(out, "Total Addresses:     {}", self.total_addresses).unwrap();
@@ -154,7 +154,7 @@ impl TextOutput for Ipv4SubnetList {
                 out,
                 "  {}. {}/{} (Hosts: {}-{})",
                 i + 1,
-                subnet.network_address,
+                subnet.network,
                 subnet.prefix_length,
                 subnet.first_host,
                 subnet.last_host
@@ -179,7 +179,7 @@ impl TextOutput for Ipv6SubnetList {
                 out,
                 "  {}. {}/{}",
                 i + 1,
-                subnet.network_address,
+                subnet.network,
                 subnet.prefix_length
             )
             .unwrap();
@@ -209,14 +209,7 @@ impl TextOutput for Ipv4SummaryResult {
         writeln!(out, "Output CIDRs:  {}", self.output_count).unwrap();
         writeln!(out).unwrap();
         for (i, cidr) in self.cidrs.iter().enumerate() {
-            writeln!(
-                out,
-                "  {}. {}/{}",
-                i + 1,
-                cidr.network_address,
-                cidr.prefix_length
-            )
-            .unwrap();
+            writeln!(out, "  {}. {}/{}", i + 1, cidr.network, cidr.prefix_length).unwrap();
         }
         out
     }
@@ -231,14 +224,7 @@ impl TextOutput for Ipv6SummaryResult {
         writeln!(out, "Output CIDRs:  {}", self.output_count).unwrap();
         writeln!(out).unwrap();
         for (i, cidr) in self.cidrs.iter().enumerate() {
-            writeln!(
-                out,
-                "  {}. {}/{}",
-                i + 1,
-                cidr.network_address,
-                cidr.prefix_length
-            )
-            .unwrap();
+            writeln!(out, "  {}. {}/{}", i + 1, cidr.network, cidr.prefix_length).unwrap();
         }
         out
     }
@@ -254,14 +240,7 @@ impl TextOutput for Ipv4FromRangeResult {
         writeln!(out, "CIDR Count:    {}", self.cidr_count).unwrap();
         writeln!(out).unwrap();
         for (i, cidr) in self.cidrs.iter().enumerate() {
-            writeln!(
-                out,
-                "  {}. {}/{}",
-                i + 1,
-                cidr.network_address,
-                cidr.prefix_length
-            )
-            .unwrap();
+            writeln!(out, "  {}. {}/{}", i + 1, cidr.network, cidr.prefix_length).unwrap();
         }
         out
     }
@@ -277,14 +256,7 @@ impl TextOutput for Ipv6FromRangeResult {
         writeln!(out, "CIDR Count:    {}", self.cidr_count).unwrap();
         writeln!(out).unwrap();
         for (i, cidr) in self.cidrs.iter().enumerate() {
-            writeln!(
-                out,
-                "  {}. {}/{}",
-                i + 1,
-                cidr.network_address,
-                cidr.prefix_length
-            )
-            .unwrap();
+            writeln!(out, "  {}. {}/{}", i + 1, cidr.network, cidr.prefix_length).unwrap();
         }
         out
     }
@@ -345,13 +317,13 @@ fn ipv4_csv_header() -> &'static [&'static str] {
 fn write_ipv4_csv_record(wtr: &mut csv::Writer<Vec<u8>>, s: &Ipv4Subnet) -> Result<()> {
     wtr.write_record([
         &s.input,
-        &s.network_address,
-        &s.broadcast_address,
-        &s.subnet_mask,
-        &s.wildcard_mask,
+        &s.network.to_string(),
+        &s.broadcast.to_string(),
+        &s.mask.to_string(),
+        &s.wildcard.to_string(),
         &s.prefix_length.to_string(),
-        &s.first_host,
-        &s.last_host,
+        &s.first_host.to_string(),
+        &s.last_host.to_string(),
         &s.total_hosts.to_string(),
         &s.usable_hosts.to_string(),
         &s.network_class,
@@ -378,9 +350,9 @@ fn ipv6_csv_header() -> &'static [&'static str] {
 fn write_ipv6_csv_record(wtr: &mut csv::Writer<Vec<u8>>, s: &Ipv6Subnet) -> Result<()> {
     wtr.write_record([
         &s.input,
-        &s.network_address,
+        &s.network.to_string(),
         &s.network_address_full,
-        &s.last_address,
+        &s.last.to_string(),
         &s.last_address_full,
         &s.prefix_length.to_string(),
         &s.total_addresses,
@@ -587,13 +559,13 @@ impl CsvOutput for BatchResult {
                     SubnetResult::V4(s) => {
                         wtr.write_record([
                             &entry.cidr,
-                            &s.network_address,
-                            &s.broadcast_address,
-                            &s.subnet_mask,
-                            &s.wildcard_mask,
+                            &s.network.to_string(),
+                            &s.broadcast.to_string(),
+                            &s.mask.to_string(),
+                            &s.wildcard.to_string(),
                             &s.prefix_length.to_string(),
-                            &s.first_host,
-                            &s.last_host,
+                            &s.first_host.to_string(),
+                            &s.last_host.to_string(),
                             &s.total_hosts.to_string(),
                             &s.usable_hosts.to_string(),
                             &s.network_class,
@@ -611,7 +583,7 @@ impl CsvOutput for BatchResult {
                     SubnetResult::V6(s) => {
                         wtr.write_record([
                             &entry.cidr,
-                            &s.network_address,
+                            &s.network.to_string(),
                             "",
                             "",
                             "",
@@ -623,7 +595,7 @@ impl CsvOutput for BatchResult {
                             "",
                             "",
                             &s.network_address_full,
-                            &s.last_address,
+                            &s.last.to_string(),
                             &s.last_address_full,
                             &s.total_addresses,
                             &s.hextets.join(":"),
