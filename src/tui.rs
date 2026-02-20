@@ -168,8 +168,16 @@ pub fn run_tui() -> io::Result<()> {
                 KeyCode::Esc => break,
                 KeyCode::Tab => app.toggle_mode(),
                 KeyCode::Enter => app.next_field(),
-                KeyCode::Char('m') | KeyCode::Char('M') => app.toggle_max(),
-                KeyCode::Char('c') | KeyCode::Char('C') => app.toggle_count_only(),
+                KeyCode::Char('m') | KeyCode::Char('M')
+                    if app.mode == Mode::Split && app.active_field == InputField::Count =>
+                {
+                    app.toggle_max()
+                }
+                KeyCode::Char('c') | KeyCode::Char('C')
+                    if app.mode == Mode::Split && app.active_field == InputField::Count =>
+                {
+                    app.toggle_count_only()
+                }
                 KeyCode::Char(c) => app.handle_char_input(c),
                 KeyCode::Backspace => app.handle_backspace(),
                 KeyCode::Up => app.scroll_up(),
@@ -613,6 +621,20 @@ mod tests {
         app.handle_char_input('/');
         app.handle_char_input(':');
         assert_eq!(app.cidr_input, "a/:");
+    }
+
+    #[test]
+    fn char_input_cidr_accepts_hex_chars() {
+        // Regression: 'c'/'C' and 'm'/'M' must not be swallowed by shortcut
+        // handlers when the CIDR field is active (needed for IPv6 input).
+        let mut app = AppState::new();
+        app.cidr_input.clear();
+        for ch in [
+            'a', 'b', 'c', 'd', 'e', 'f', 'A', 'B', 'C', 'D', 'E', 'F', 'm', 'M',
+        ] {
+            app.handle_char_input(ch);
+        }
+        assert_eq!(app.cidr_input, "abcdefABCDEFmM");
     }
 
     #[test]
