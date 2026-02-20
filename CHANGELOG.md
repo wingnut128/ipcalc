@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-02-20
+
+### Changed
+
+- Restructured `Ipv4Subnet` to store IP addresses as native `Ipv4Addr` instead of `String`, eliminating parse-format-reparse overhead
+- Restructured `Ipv6Subnet` to store `network`/`last` as native `Ipv6Addr` instead of `String`
+- JSON API output unchanged — backward compatibility preserved via `#[serde(rename)]` attributes
+- Replaced `split('/').collect::<Vec<&str>>()` with `split_once('/')` in CIDR parsing for both IPv4 and IPv6
+- Optimized `Ipv6Subnet::format_full` from `Vec<String>` intermediate allocation to a single `format!()` call
+- Improved error-masking tests across all modules to assert specific `IpCalcError` variants instead of generic `is_err()` checks
+
+### Fixed
+
+- TUI: `c`/`C` and `m`/`M` keys were unconditionally captured by shortcut handlers, preventing IPv6 hex address entry in the CIDR input field
+
 ## [0.9.0] - 2026-02-19
 
 ### Added
@@ -294,7 +309,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dockerfile for containerized deployment
 - Makefile for common development tasks
 
-[Unreleased]: https://github.com/wingnut128/ipcalc/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/wingnut128/ipcalc/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/wingnut128/ipcalc/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/wingnut128/ipcalc/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/wingnut128/ipcalc/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/wingnut128/ipcalc/compare/v0.7.0...v0.8.0
