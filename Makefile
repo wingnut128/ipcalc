@@ -2,6 +2,7 @@
 .PHONY: build-tui release-tui build-no-default release-no-default build-all-features release-all-features
 .PHONY: fuzz
 .PHONY: install install-tui install-all-features uninstall
+.PHONY: build-mcp test-mcp clean-mcp
 
 # Variables
 BINARY_NAME := ipcalc
@@ -111,8 +112,20 @@ FUZZ_DURATION ?= 60
 fuzz:
 	cargo +nightly fuzz run $(FUZZ_TARGET) -- -max_total_time=$(FUZZ_DURATION)
 
+# Build MCP server (TypeScript)
+build-mcp:
+	cd mcp-server && npm install && npm run build
+
+# Run MCP server tests (requires release binary)
+test-mcp: release build-mcp
+	cd mcp-server && npm test
+
+# Clean MCP server build artifacts
+clean-mcp:
+	rm -rf mcp-server/dist mcp-server/node_modules
+
 # Check everything (format, lint, test)
-check: fmt-check lint test test-tui
+check: fmt-check lint test test-tui test-mcp
 
 # CI pipeline target
 ci: check
@@ -142,10 +155,12 @@ help:
 	@echo "  release-no-default     Build release binary without default features"
 	@echo "  build-all-features     Build debug binary with all features"
 	@echo "  release-all-features   Build release binary with all features"
+	@echo "  build-mcp              Build MCP server (TypeScript)"
 	@echo ""
 	@echo "Test Targets:"
 	@echo "  test                   Run all tests"
 	@echo "  test-tui               Run TUI tests (requires tui feature)"
+	@echo "  test-mcp               Run MCP server tests"
 	@echo "  test-verbose           Run tests with output"
 	@echo "  lint                   Run clippy linter"
 	@echo "  fmt                    Format code"
