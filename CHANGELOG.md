@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-02-25
+
 ### Added
 
 - MCP (Model Context Protocol) server for AI assistant integration via stdio transport
@@ -15,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Delegates all calculations to the `ipcalc` binary (JSON output)
   - Auto-detects IPv4 vs IPv6 from input
   - 13 unit tests covering all tools and error paths
+- MCP server setup instructions in README for Claude Code and Claude Desktop
 - `make build-mcp` / `make test-mcp` targets
 - `test-mcp` added to `make check` pipeline
 
@@ -320,7 +323,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dockerfile for containerized deployment
 - Makefile for common development tasks
 
-[Unreleased]: https://github.com/wingnut128/ipcalc/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/wingnut128/ipcalc/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/wingnut128/ipcalc/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/wingnut128/ipcalc/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/wingnut128/ipcalc/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/wingnut128/ipcalc/compare/v0.8.0...v0.8.1
