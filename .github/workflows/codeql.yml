@@ -7,14 +7,12 @@ on:
       - '**.md'
       - 'LICENSE'
       - '.gitignore'
-      - 'mcp-server/**'
   pull_request:
     branches: [ main ]
     paths-ignore:
       - '**.md'
       - 'LICENSE'
       - '.gitignore'
-      - 'mcp-server/**'
   schedule:
     - cron: '0 0 * * 1'  # Run every Monday at midnight
 
@@ -30,7 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [ 'rust' ]
+        language: [ 'rust', 'javascript-typescript' ]
 
     steps:
       - name: Checkout repository
