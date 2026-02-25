@@ -4,7 +4,7 @@
 [![CodeQL](https://github.com/wingnut128/ipcalc/actions/workflows/codeql.yml/badge.svg)](https://github.com/wingnut128/ipcalc/actions/workflows/codeql.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A fast IPv4 and IPv6 subnet calculator written in Rust. Available as both a CLI tool and HTTP API.
+A fast IPv4 and IPv6 subnet calculator written in Rust. Available as a CLI tool, HTTP API, and MCP server for AI assistants.
 
 ## Features
 
@@ -20,6 +20,7 @@ A fast IPv4 and IPv6 subnet calculator written in Rust. Available as both a CLI 
 - **File output**: write results directly to a file
 - **HTTP API**: REST endpoints for all calculations
 - **OpenAPI documentation**: Machine-readable API specification for easy integration with tools like Swagger Editor, Postman, and Insomnia
+- **MCP server**: [Model Context Protocol](https://modelcontextprotocol.io) server for AI assistant integration (Claude, etc.) over stdio
 - **Configurable security**: rate limiting, request size limits, timeouts, restrictive CORS, and security headers
 - **TOML configuration**: server settings via config file with CLI flag overrides
 
@@ -202,6 +203,76 @@ ipcalc --tui
 The TUI automatically detects IPv4/IPv6 and provides color-coded input fields with real-time error messages.
 
 **Note:** The TUI feature is optional and must be enabled at build time with the `tui` feature flag. It is not included in the default build to keep the binary size smaller.
+
+### MCP Server (AI Assistant Integration)
+
+The MCP server lets AI assistants like Claude use ipcalc as a tool for subnet calculations. It communicates over stdio using the [Model Context Protocol](https://modelcontextprotocol.io).
+
+**Prerequisites:** Node.js 18+ and the `ipcalc` release binary.
+
+```bash
+# Build the ipcalc binary and MCP server
+make release
+make build-mcp
+```
+
+**Available tools:**
+
+| Tool | Description |
+|------|-------------|
+| `subnet_calc` | Calculate IPv4/IPv6 subnet details from CIDR notation |
+| `subnet_split` | Split a supernet into smaller subnets |
+| `contains_check` | Check if an IP address is within a CIDR range |
+| `from_range` | Convert an IP address range to minimal CIDR blocks |
+| `summarize` | Aggregate CIDRs into the minimal covering set |
+
+#### Claude Code
+
+Add to `~/.claude.json`:
+
+```json
+{
+  "mcpServers": {
+    "ipcalc": {
+      "command": "node",
+      "args": ["/absolute/path/to/ipcalc/mcp-server/dist/index.js"]
+    }
+  }
+}
+```
+
+#### Claude Desktop
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+
+```json
+{
+  "mcpServers": {
+    "ipcalc": {
+      "command": "node",
+      "args": ["/absolute/path/to/ipcalc/mcp-server/dist/index.js"]
+    }
+  }
+}
+```
+
+#### Custom binary path
+
+By default the MCP server looks for the `ipcalc` binary at `../../target/release/ipcalc` relative to the script. Override this with the `IPCALC_BIN` environment variable:
+
+```json
+{
+  "mcpServers": {
+    "ipcalc": {
+      "command": "node",
+      "args": ["/absolute/path/to/ipcalc/mcp-server/dist/index.js"],
+      "env": {
+        "IPCALC_BIN": "/usr/local/bin/ipcalc"
+      }
+    }
+  }
+}
+```
 
 ### HTTP API Server
 
@@ -400,6 +471,12 @@ make lint
 
 # Build release binary
 make release
+
+# Build MCP server
+make build-mcp
+
+# Run MCP server tests
+make test-mcp
 
 # Build Docker image
 make docker
