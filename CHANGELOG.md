@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- CI: removed `mcp-server/**` from `paths-ignore` in CI and CodeQL workflows
+- CI: added `mcp-server` job with TypeScript lint, build, and test steps
+- CodeQL: added `javascript-typescript` to language scanning matrix
+
 ## [0.11.0] - 2026-02-25
 
 ### Added
