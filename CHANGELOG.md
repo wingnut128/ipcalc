@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- MCP (Model Context Protocol) server for AI assistant integration via stdio transport
+  - TypeScript implementation in `mcp-server/` using `@modelcontextprotocol/sdk`
+  - 5 tools: `subnet_calc`, `subnet_split`, `contains_check`, `from_range`, `summarize`
+  - Delegates all calculations to the `ipcalc` binary (JSON output)
+  - Auto-detects IPv4 vs IPv6 from input
+  - 13 unit tests covering all tools and error paths
+- `make build-mcp` / `make test-mcp` targets
+- `test-mcp` added to `make check` pipeline
+
 ## [0.10.0] - 2026-02-20
 
 ### Changed
