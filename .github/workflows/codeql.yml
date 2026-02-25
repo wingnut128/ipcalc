@@ -3,8 +3,18 @@ name: CodeQL
 on:
   push:
     branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+      - '.gitignore'
+      - 'mcp-server/**'
   pull_request:
     branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+      - '.gitignore'
+      - 'mcp-server/**'
   schedule:
     - cron: '0 0 * * 1'  # Run every Monday at midnight
 
