@@ -478,11 +478,16 @@ make build-mcp
 # Run MCP server tests
 make test-mcp
 
+# Run semgrep security scanning
+make semgrep
+
 # Build Docker image
 make docker
 ```
 
 The `make setup` command installs a pre-commit hook that automatically runs `cargo fmt --check` and `cargo clippy` before each commit.
+
+`make check` runs formatting, linting, all tests (including TUI and MCP), and Semgrep security scanning.
 
 ### Fuzz Testing
 
