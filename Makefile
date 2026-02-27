@@ -128,7 +128,7 @@ clean-mcp:
 semgrep:
 	semgrep scan --config=p/owasp-top-ten --config=p/rust --error .
 
-# Check everything (format, lint, test, security scan)
+# Check everything (format, lint, tests, semgrep security scan)
 check: fmt-check lint test test-tui test-mcp semgrep
 
 # CI pipeline target
