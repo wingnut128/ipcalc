@@ -1,6 +1,6 @@
 .PHONY: all build release test test-tui lint fmt clean docker docker-run help setup
 .PHONY: build-tui release-tui build-no-default release-no-default build-all-features release-all-features
-.PHONY: fuzz
+.PHONY: fuzz semgrep
 .PHONY: install install-tui install-all-features uninstall
 .PHONY: build-mcp test-mcp clean-mcp
 
@@ -124,8 +124,12 @@ test-mcp: release build-mcp
 clean-mcp:
 	rm -rf mcp-server/dist mcp-server/node_modules
 
-# Check everything (format, lint, test)
-check: fmt-check lint test test-tui test-mcp
+# Run semgrep security scanning
+semgrep:
+	semgrep scan --config=p/owasp-top-ten --config=p/rust --error .
+
+# Check everything (format, lint, test, security scan)
+check: fmt-check lint test test-tui test-mcp semgrep
 
 # CI pipeline target
 ci: check
@@ -165,7 +169,8 @@ help:
 	@echo "  lint                   Run clippy linter"
 	@echo "  fmt                    Format code"
 	@echo "  fmt-check              Check formatting"
-	@echo "  check                  Run fmt-check, lint, and test"
+	@echo "  check                  Run fmt-check, lint, test, and semgrep"
+	@echo "  semgrep                Run semgrep security scanning"
 	@echo ""
 	@echo "Docker Targets:"
 	@echo "  docker                 Build Docker image"

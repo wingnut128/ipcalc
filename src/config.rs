@@ -51,7 +51,7 @@ pub struct CliOverrides {
 
 impl ServerConfig {
     pub fn load(path: &str) -> Result<Self> {
-        // nosemgrep: path-traversal — CLI-only startup config, not reachable from HTTP input
+        // nosemgrep: rust.actix.path-traversal.tainted-path.tainted-path — CLI-only startup config, not reachable from HTTP input
         let contents = std::fs::read_to_string(path)?;
         let config: ServerConfig =
             toml::from_str(&contents).map_err(|e| IpCalcError::ConfigParse(e.to_string()))?;
