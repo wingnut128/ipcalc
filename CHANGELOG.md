@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-02-27
+
 ### Added
 
 - `make semgrep` target for security scanning with Semgrep (p/owasp-top-ten and p/rust rulesets)
