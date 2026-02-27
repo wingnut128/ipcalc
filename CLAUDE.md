@@ -38,6 +38,15 @@ When working on a Linear ticket:
 5. Create a PR — branch protection requires all changes go through a pull request (you cannot push directly to main)
 6. After CI passes, merge the PR and clean up the branch (local + remote, prune stale refs)
 
+## Release Process
+
+Releases use a `workflow_dispatch` GitHub Actions workflow to respect branch protection on `main`.
+
+1. Create a PR that bumps the `version` in `Cargo.toml` and moves `[Unreleased]` entries to a new `[X.Y.Z]` section in `CHANGELOG.md`
+2. Merge the PR through normal review/CI
+3. Go to **Actions → Release → Run workflow** and enter the version (e.g. `0.12.0`, no leading `v`)
+4. The workflow validates `Cargo.toml` version matches, confirms a CHANGELOG entry exists, extracts release notes, creates a GitHub release with tag `vX.Y.Z`, and builds/uploads cross-platform binaries
+
 ## Build & Development Commands
 
 ```bash
