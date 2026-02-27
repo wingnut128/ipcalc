@@ -35,8 +35,16 @@ When working on a Linear ticket:
 2. Open a feature branch for the work
 3. Implement, commit, and push the branch
 4. Update `CHANGELOG.md` with the changes (add to `[Unreleased]` or a new version section as appropriate)
-5. Create a PR — branch protection requires all changes go through a pull request (you cannot push directly to main)
-6. After CI passes, merge the PR and clean up the branch (local + remote, prune stale refs)
+5. Update `README.md` when changes affect user-facing behavior: new features, changed commands, new build targets, deprecations, or removed functionality
+6. Create a PR — branch protection requires all changes go through a pull request (you cannot push directly to main)
+7. After CI passes, merge the PR and clean up the branch (local + remote, prune stale refs)
+
+### Post-commit documentation rules
+
+After every commit (whether from a Linear ticket or not):
+
+- **CHANGELOG.md**: Always add an entry under `[Unreleased]` for any meaningful change (features, fixes, refactors, CI changes, dependency updates). Only skip for typo fixes or whitespace-only changes.
+- **README.md**: Update whenever there are important changes to the codebase — new or changed CLI commands, new build/make targets, new features, deprecation warnings, removed functionality, or changes to setup/install instructions. Do not update README for purely internal refactors or CI-only changes unless they affect the developer workflow (e.g., new `make` targets).
 
 ## Release Process
 
@@ -51,7 +59,7 @@ Releases use a `workflow_dispatch` GitHub Actions workflow to respect branch pro
 
 ```bash
 # Essential commands
-make check          # Run fmt-check, lint, test, and test-tui (use before commits)
+make check          # Run fmt-check, lint, test, test-tui, test-mcp, and semgrep (use before commits)
 make test           # Run all tests
 make test-tui       # Run TUI tests (requires tui feature)
 make lint           # Run clippy with -D warnings

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `make semgrep` target for security scanning with Semgrep (p/owasp-top-ten and p/rust rulesets)
+- Semgrep added to `make check` pipeline
+
+### Fixed
+
+- Release workflow: fixed 6 shell injection findings by routing `inputs.version` through environment variable instead of inline `${{ }}` interpolation in `run:` steps
+- Fixed nosemgrep annotation in `config.rs` to use full rule ID so suppression takes effect
+
 ### Changed
 
 - CI: replaced tag-triggered release workflow with `workflow_dispatch` release workflow that validates Cargo.toml version, extracts CHANGELOG release notes, and creates GitHub release with cross-platform binaries
