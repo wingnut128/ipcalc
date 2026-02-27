@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- CI: replaced tag-triggered release workflow with `workflow_dispatch` release workflow that validates Cargo.toml version, extracts CHANGELOG release notes, and creates GitHub release with cross-platform binaries
 - CI: removed `mcp-server/**` from `paths-ignore` in CI and CodeQL workflows
 - CI: added `mcp-server` job with TypeScript lint, build, and test steps
 - CodeQL: added `javascript-typescript` to language scanning matrix
