@@ -36,49 +36,36 @@ pub struct Ipv6SubnetList {
 /// Count available subnets without generating them.
 /// Auto-detects IPv4 vs IPv6 based on the CIDR notation.
 pub fn count_subnets(cidr: &str, new_prefix: u8) -> Result<SplitSummary> {
-    let is_ipv6 = cidr.contains(':');
-
-    if is_ipv6 {
-        let supernet = Ipv6Subnet::from_cidr(cidr)?;
-        if new_prefix <= supernet.prefix_length {
-            return Err(IpCalcError::InvalidSubnetSplit {
-                new_prefix,
-                original_prefix: supernet.prefix_length,
-            });
-        }
-        if new_prefix > 128 {
-            return Err(IpCalcError::InvalidPrefixLength(new_prefix));
-        }
-        let bits_diff = new_prefix - supernet.prefix_length;
-        let available = if bits_diff > 63 {
-            format!("2^{}", bits_diff)
-        } else {
-            2u64.pow(bits_diff as u32).to_string()
-        };
-        Ok(SplitSummary {
-            supernet: supernet.input,
-            new_prefix,
-            available_subnets: available,
-        })
+    let (input, original_prefix, max_bits) = if cidr.contains(':') {
+        let s = Ipv6Subnet::from_cidr(cidr)?;
+        (s.input, s.prefix_length, 128u8)
     } else {
-        let supernet = Ipv4Subnet::from_cidr(cidr)?;
-        if new_prefix <= supernet.prefix_length {
-            return Err(IpCalcError::InvalidSubnetSplit {
-                new_prefix,
-                original_prefix: supernet.prefix_length,
-            });
-        }
-        if new_prefix > 32 {
-            return Err(IpCalcError::InvalidPrefixLength(new_prefix));
-        }
-        let bits_diff = new_prefix - supernet.prefix_length;
-        let available = 2u64.pow(bits_diff as u32).to_string();
-        Ok(SplitSummary {
-            supernet: supernet.input,
+        let s = Ipv4Subnet::from_cidr(cidr)?;
+        (s.input, s.prefix_length, 32u8)
+    };
+
+    if new_prefix <= original_prefix {
+        return Err(IpCalcError::InvalidSubnetSplit {
             new_prefix,
-            available_subnets: available,
-        })
+            original_prefix,
+        });
     }
+    if new_prefix > max_bits {
+        return Err(IpCalcError::InvalidPrefixLength(new_prefix));
+    }
+
+    let bits_diff = new_prefix - original_prefix;
+    let available = if bits_diff > 63 {
+        format!("2^{}", bits_diff)
+    } else {
+        2u64.pow(bits_diff as u32).to_string()
+    };
+
+    Ok(SplitSummary {
+        supernet: input,
+        new_prefix,
+        available_subnets: available,
+    })
 }
 
 /// Generate IPv4 subnets from a supernet.

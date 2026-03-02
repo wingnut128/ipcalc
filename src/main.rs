@@ -8,9 +8,10 @@ use ipcalc::from_range::{from_range_ipv4, from_range_ipv6};
 use ipcalc::ipv4::Ipv4Subnet;
 use ipcalc::ipv6::Ipv6Subnet;
 use ipcalc::logging::{LogConfig, init_logging, parse_log_level};
-use ipcalc::output::{OutputFormat, OutputWriter};
+use ipcalc::output::{CsvOutput, OutputFormat, OutputWriter, TextOutput};
 use ipcalc::subnet_generator::{count_subnets, generate_ipv4_subnets, generate_ipv6_subnets};
 use ipcalc::summarize::{summarize_ipv4, summarize_ipv6};
+use serde::Serialize;
 use std::io::{self, BufRead, Write};
 use std::net::SocketAddr;
 use tracing::{info, warn};
@@ -24,6 +25,26 @@ fn print_stdout(s: &str) {
         }
         eprintln!("Error writing to stdout: {}", e);
         std::process::exit(1);
+    }
+}
+
+/// Handle a Result from a calculation: write output on success, print error and exit on failure.
+fn handle_result<T: Serialize + TextOutput + CsvOutput>(
+    writer: &OutputWriter,
+    result: ipcalc::error::Result<T>,
+    output_file: &Option<String>,
+) {
+    match result {
+        Ok(val) => {
+            let output = writer.write(&val).expect("Failed to write output");
+            if output_file.is_none() {
+                print_stdout(&output);
+            }
+        }
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            std::process::exit(1);
+        }
     }
 }
 
@@ -88,84 +109,20 @@ async fn main() {
         if cidrs.len() == 1 {
             // Single CIDR — preserve flat output for backward compatibility
             let cidr = &cidrs[0];
-            let is_ipv6 = cidr.contains(':');
-            if is_ipv6 {
-                match Ipv6Subnet::from_cidr(cidr) {
-                    Ok(subnet) => {
-                        let output = writer.write(&subnet).expect("Failed to write output");
-                        if cli.output.is_none() {
-                            print_stdout(&output);
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!("Error: {}", e);
-                        std::process::exit(1);
-                    }
-                }
+            if cidr.contains(':') {
+                handle_result(&writer, Ipv6Subnet::from_cidr(cidr), &cli.output);
             } else {
-                match Ipv4Subnet::from_cidr(cidr) {
-                    Ok(subnet) => {
-                        let output = writer.write(&subnet).expect("Failed to write output");
-                        if cli.output.is_none() {
-                            print_stdout(&output);
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!("Error: {}", e);
-                        std::process::exit(1);
-                    }
-                }
+                handle_result(&writer, Ipv4Subnet::from_cidr(cidr), &cli.output);
             }
         } else {
             // Multiple CIDRs — batch mode
-            match process_batch(&cidrs) {
-                Ok(batch_result) => {
-                    let output = writer.write(&batch_result).expect("Failed to write output");
-                    if cli.output.is_none() {
-                        print_stdout(&output);
-                    }
-                }
-                Err(e) => {
-                    eprintln!("Error: {}", e);
-                    std::process::exit(1);
-                }
-            }
+            handle_result(&writer, process_batch(&cidrs), &cli.output);
         }
         return;
     }
 
     // Handle subcommands
     match cli.command {
-        Some(Commands::Ipv4 { cidr }) => {
-            eprintln!("Warning: 'v4' is deprecated, use 'ipcalc <cidr>' instead");
-            match Ipv4Subnet::from_cidr(&cidr) {
-                Ok(subnet) => {
-                    let output = writer.write(&subnet).expect("Failed to write output");
-                    if cli.output.is_none() {
-                        print_stdout(&output);
-                    }
-                }
-                Err(e) => {
-                    eprintln!("Error: {}", e);
-                    std::process::exit(1);
-                }
-            }
-        }
-        Some(Commands::Ipv6 { cidr }) => {
-            eprintln!("Warning: 'v6' is deprecated, use 'ipcalc <cidr>' instead");
-            match Ipv6Subnet::from_cidr(&cidr) {
-                Ok(subnet) => {
-                    let output = writer.write(&subnet).expect("Failed to write output");
-                    if cli.output.is_none() {
-                        print_stdout(&output);
-                    }
-                }
-                Err(e) => {
-                    eprintln!("Error: {}", e);
-                    std::process::exit(1);
-                }
-            }
-        }
         Some(Commands::Split {
             cidr,
             prefix,
@@ -174,23 +131,9 @@ async fn main() {
             count_only,
         }) => {
             if count_only {
-                match count_subnets(&cidr, prefix) {
-                    Ok(summary) => {
-                        let output = writer.write(&summary).expect("Failed to write output");
-                        if cli.output.is_none() {
-                            print_stdout(&output);
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!("Error: {}", e);
-                        std::process::exit(1);
-                    }
-                }
+                handle_result(&writer, count_subnets(&cidr, prefix), &cli.output);
                 return;
             }
-
-            // Detect IPv4 vs IPv6 based on CIDR format
-            let is_ipv6 = cidr.contains(':');
 
             // Determine the actual count to use
             let actual_count = if max {
@@ -205,97 +148,40 @@ async fn main() {
                 }
             };
 
-            if is_ipv6 {
-                match generate_ipv6_subnets(&cidr, prefix, actual_count) {
-                    Ok(result) => {
-                        let output = writer.write(&result).expect("Failed to write output");
-                        if cli.output.is_none() {
-                            print_stdout(&output);
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!("Error: {}", e);
-                        std::process::exit(1);
-                    }
-                }
+            if cidr.contains(':') {
+                handle_result(
+                    &writer,
+                    generate_ipv6_subnets(&cidr, prefix, actual_count),
+                    &cli.output,
+                );
             } else {
-                match generate_ipv4_subnets(&cidr, prefix, actual_count) {
-                    Ok(result) => {
-                        let output = writer.write(&result).expect("Failed to write output");
-                        if cli.output.is_none() {
-                            print_stdout(&output);
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!("Error: {}", e);
-                        std::process::exit(1);
-                    }
-                }
+                handle_result(
+                    &writer,
+                    generate_ipv4_subnets(&cidr, prefix, actual_count),
+                    &cli.output,
+                );
             }
         }
         Some(Commands::Contains { cidr, address }) => {
-            let is_ipv6 = cidr.contains(':');
-            let result = if is_ipv6 {
+            let result = if cidr.contains(':') {
                 check_ipv6_contains(&cidr, &address)
             } else {
                 check_ipv4_contains(&cidr, &address)
             };
-
-            match result {
-                Ok(contains_result) => {
-                    let output = writer
-                        .write(&contains_result)
-                        .expect("Failed to write output");
-                    if cli.output.is_none() {
-                        print_stdout(&output);
-                    }
-                }
-                Err(e) => {
-                    eprintln!("Error: {}", e);
-                    std::process::exit(1);
-                }
-            }
+            handle_result(&writer, result, &cli.output);
         }
         Some(Commands::FromRange { start, end }) => {
-            let is_ipv6 = start.contains(':');
-            let result = if is_ipv6 {
-                from_range_ipv6(&start, &end)
-                    .map(|r| writer.write(&r).expect("Failed to write output"))
+            if start.contains(':') {
+                handle_result(&writer, from_range_ipv6(&start, &end), &cli.output);
             } else {
-                from_range_ipv4(&start, &end)
-                    .map(|r| writer.write(&r).expect("Failed to write output"))
-            };
-
-            match result {
-                Ok(output) => {
-                    if cli.output.is_none() {
-                        print_stdout(&output);
-                    }
-                }
-                Err(e) => {
-                    eprintln!("Error: {}", e);
-                    std::process::exit(1);
-                }
+                handle_result(&writer, from_range_ipv4(&start, &end), &cli.output);
             }
         }
         Some(Commands::Summarize { cidrs }) => {
-            let is_ipv6 = cidrs.iter().any(|c| c.contains(':'));
-            let result = if is_ipv6 {
-                summarize_ipv6(&cidrs).map(|r| writer.write(&r).expect("Failed to write output"))
+            if cidrs.iter().any(|c| c.contains(':')) {
+                handle_result(&writer, summarize_ipv6(&cidrs), &cli.output);
             } else {
-                summarize_ipv4(&cidrs).map(|r| writer.write(&r).expect("Failed to write output"))
-            };
-
-            match result {
-                Ok(output) => {
-                    if cli.output.is_none() {
-                        print_stdout(&output);
-                    }
-                }
-                Err(e) => {
-                    eprintln!("Error: {}", e);
-                    std::process::exit(1);
-                }
+                handle_result(&writer, summarize_ipv4(&cidrs), &cli.output);
             }
         }
         Some(Commands::Serve {

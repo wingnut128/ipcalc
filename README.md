@@ -438,7 +438,7 @@ Options:
 **Notes:**
 - Multiple CIDRs can be passed as positional arguments for batch processing
 - The `--stdin` flag reads CIDRs from stdin (blank lines and `#` comments are skipped)
-- The legacy `v4` and `v6` subcommands are still supported for backwards compatibility but are deprecated
+- The legacy `v4` and `v6` CLI subcommands have been removed; use `ipcalc <cidr>` directly
 - The `--tui` flag is only available when built with the `tui` feature: `cargo build --features tui`
 
 ## Docker

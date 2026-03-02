@@ -31,6 +31,16 @@ pub struct Ipv4Subnet {
     pub address_type: String,
 }
 
+/// Compute the IPv4 subnet mask for a given prefix length.
+/// Prefix must be 0..=32; values outside this range produce meaningless results.
+pub fn ipv4_mask(prefix: u8) -> u32 {
+    if prefix == 0 {
+        0
+    } else {
+        !0u32 << (32 - prefix)
+    }
+}
+
 const MAX_INPUT_LENGTH: usize = 256;
 
 impl Ipv4Subnet {
@@ -61,11 +71,7 @@ impl Ipv4Subnet {
         }
 
         let addr_u32 = u32::from(addr);
-        let mask = if prefix == 0 {
-            0
-        } else {
-            !0u32 << (32 - prefix)
-        };
+        let mask = ipv4_mask(prefix);
         let wildcard_val = !mask;
 
         let network = addr_u32 & mask;

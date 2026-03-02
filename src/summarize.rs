@@ -28,17 +28,22 @@ pub struct Ipv6SummaryResult {
 // Generic summarization algorithm over (network, prefix) pairs
 // ---------------------------------------------------------------------------
 
+/// Compute a u128 mask for a given prefix, accounting for address family bit width.
+/// For IPv4 (bits=32), computes via u32 then extends; for IPv6 (bits=128), computes directly.
+fn prefix_mask(prefix: u8, bits: u8) -> u128 {
+    if prefix == 0 {
+        0u128
+    } else if bits == 32 {
+        (crate::ipv4::ipv4_mask(prefix)) as u128
+    } else {
+        crate::ipv6::ipv6_mask(prefix)
+    }
+}
+
 fn normalize_and_sort(entries: &mut Vec<(u128, u8)>, bits: u8) {
     // Normalize: zero host bits
     for entry in entries.iter_mut() {
-        let mask = if entry.1 == 0 {
-            0u128
-        } else if bits == 32 {
-            (!0u32 << (32 - entry.1)) as u128
-        } else {
-            !0u128 << (128 - entry.1)
-        };
-        entry.0 &= mask;
+        entry.0 &= prefix_mask(entry.1, bits);
     }
 
     // Sort by (network asc, prefix asc)
@@ -59,13 +64,7 @@ fn remove_contained(entries: &mut Vec<(u128, u8)>, bits: u8) {
     for &entry in &entries[1..] {
         let last = kept.last().unwrap();
         // Check if entry is contained in last kept entry
-        let mask = if last.1 == 0 {
-            0u128
-        } else if bits == 32 {
-            (!0u32 << (32 - last.1)) as u128
-        } else {
-            !0u128 << (128 - last.1)
-        };
+        let mask = prefix_mask(last.1, bits);
 
         if entry.1 >= last.1 && (entry.0 & mask) == last.0 {
             // entry is contained in last, skip
@@ -97,14 +96,7 @@ fn merge_siblings(entries: &mut Vec<(u128, u8)>, bits: u8) {
 
                     if parent_a == parent_b {
                         // Merge into parent
-                        let parent_mask = if parent_prefix == 0 {
-                            0u128
-                        } else if bits == 32 {
-                            (!0u32 << (32 - parent_prefix)) as u128
-                        } else {
-                            !0u128 << (128 - parent_prefix)
-                        };
-                        result.push((net_a & parent_mask, parent_prefix));
+                        result.push((net_a & prefix_mask(parent_prefix, bits), parent_prefix));
                         merged = true;
                         i += 2;
                         continue;
@@ -143,11 +135,13 @@ pub const DEFAULT_MAX_SUMMARIZE_INPUTS: usize = 10_000;
 // Public entry points
 // ---------------------------------------------------------------------------
 
-pub fn summarize_ipv4(cidrs: &[String]) -> Result<Ipv4SummaryResult> {
-    summarize_ipv4_with_limit(cidrs, DEFAULT_MAX_SUMMARIZE_INPUTS)
-}
-
-pub fn summarize_ipv4_with_limit(cidrs: &[String], max_inputs: usize) -> Result<Ipv4SummaryResult> {
+/// Validate inputs and run the summarization algorithm, returning raw (network, prefix) pairs.
+fn validate_and_summarize(
+    cidrs: &[String],
+    max_inputs: usize,
+    bits: u8,
+    parse: impl Fn(&str) -> Result<(u128, u8)>,
+) -> Result<(usize, Vec<(u128, u8)>)> {
     if cidrs.is_empty() {
         return Err(IpCalcError::EmptyCidrList);
     }
@@ -159,23 +153,29 @@ pub fn summarize_ipv4_with_limit(cidrs: &[String], max_inputs: usize) -> Result<
     }
 
     let input_count = cidrs.len();
-
-    // Parse and validate all CIDRs, extract (network_u32, prefix) pairs
     let mut entries: Vec<(u128, u8)> = Vec::with_capacity(cidrs.len());
     for cidr in cidrs {
-        let subnet = Ipv4Subnet::from_cidr(cidr)?;
-        let network_u32 = u32::from(subnet.network);
-        entries.push((network_u32 as u128, subnet.prefix_length));
+        entries.push(parse(cidr)?);
     }
 
-    summarize_entries(&mut entries, 32);
+    summarize_entries(&mut entries, bits);
+    Ok((input_count, entries))
+}
 
-    // Reconstruct Ipv4Subnet from results
+pub fn summarize_ipv4(cidrs: &[String]) -> Result<Ipv4SummaryResult> {
+    summarize_ipv4_with_limit(cidrs, DEFAULT_MAX_SUMMARIZE_INPUTS)
+}
+
+pub fn summarize_ipv4_with_limit(cidrs: &[String], max_inputs: usize) -> Result<Ipv4SummaryResult> {
+    let (input_count, entries) = validate_and_summarize(cidrs, max_inputs, 32, |cidr| {
+        let subnet = Ipv4Subnet::from_cidr(cidr)?;
+        Ok((u32::from(subnet.network) as u128, subnet.prefix_length))
+    })?;
+
     let mut result_cidrs = Vec::with_capacity(entries.len());
     for (network, prefix) in &entries {
         let addr = Ipv4Addr::from(*network as u32);
-        let subnet = Ipv4Subnet::new(addr, *prefix)?;
-        result_cidrs.push(subnet);
+        result_cidrs.push(Ipv4Subnet::new(addr, *prefix)?);
     }
 
     Ok(Ipv4SummaryResult {
@@ -190,32 +190,15 @@ pub fn summarize_ipv6(cidrs: &[String]) -> Result<Ipv6SummaryResult> {
 }
 
 pub fn summarize_ipv6_with_limit(cidrs: &[String], max_inputs: usize) -> Result<Ipv6SummaryResult> {
-    if cidrs.is_empty() {
-        return Err(IpCalcError::EmptyCidrList);
-    }
-    if cidrs.len() > max_inputs {
-        return Err(IpCalcError::SummarizeInputLimitExceeded {
-            count: cidrs.len(),
-            limit: max_inputs,
-        });
-    }
-
-    let input_count = cidrs.len();
-
-    let mut entries: Vec<(u128, u8)> = Vec::with_capacity(cidrs.len());
-    for cidr in cidrs {
+    let (input_count, entries) = validate_and_summarize(cidrs, max_inputs, 128, |cidr| {
         let subnet = Ipv6Subnet::from_cidr(cidr)?;
-        let network_u128 = u128::from(subnet.network);
-        entries.push((network_u128, subnet.prefix_length));
-    }
-
-    summarize_entries(&mut entries, 128);
+        Ok((u128::from(subnet.network), subnet.prefix_length))
+    })?;
 
     let mut result_cidrs = Vec::with_capacity(entries.len());
     for (network, prefix) in &entries {
         let addr = Ipv6Addr::from(*network);
-        let subnet = Ipv6Subnet::new(addr, *prefix)?;
-        result_cidrs.push(subnet);
+        result_cidrs.push(Ipv6Subnet::new(addr, *prefix)?);
     }
 
     Ok(Ipv6SummaryResult {
