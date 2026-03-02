@@ -46,13 +46,12 @@ impl LogConfig {
 
 /// Initialize logging and return a guard that must be held for the lifetime of the program.
 /// Dropping the guard will flush any remaining log entries.
-pub fn init_logging(config: &LogConfig) -> Option<WorkerGuard> {
+pub fn init_logging(config: &LogConfig) -> WorkerGuard {
     let filter = EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| EnvFilter::new(config.level.to_string()));
 
-    match &config.file_path {
+    let (non_blocking, guard) = match &config.file_path {
         Some(path) => {
-            // File logging
             let path = Path::new(path);
             let parent = path.parent().unwrap_or(Path::new("."));
             let filename = path
@@ -61,48 +60,33 @@ pub fn init_logging(config: &LogConfig) -> Option<WorkerGuard> {
                 .unwrap_or("ipcalc.log");
 
             let file_appender = tracing_appender::rolling::never(parent, filename);
-            let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
-
-            if config.json_format {
-                tracing_subscriber::registry()
-                    .with(filter)
-                    .with(
-                        fmt::layer()
-                            .json()
-                            .with_writer(non_blocking)
-                            .with_span_events(FmtSpan::CLOSE),
-                    )
-                    .init();
-            } else {
-                tracing_subscriber::registry()
-                    .with(filter)
-                    .with(
-                        fmt::layer()
-                            .with_writer(non_blocking)
-                            .with_span_events(FmtSpan::CLOSE),
-                    )
-                    .init();
-            }
-
-            Some(guard)
+            tracing_appender::non_blocking(file_appender)
         }
-        None => {
-            // Stdout logging
-            if config.json_format {
-                tracing_subscriber::registry()
-                    .with(filter)
-                    .with(fmt::layer().json().with_span_events(FmtSpan::CLOSE))
-                    .init();
-            } else {
-                tracing_subscriber::registry()
-                    .with(filter)
-                    .with(fmt::layer().with_span_events(FmtSpan::CLOSE))
-                    .init();
-            }
+        None => tracing_appender::non_blocking(std::io::stdout()),
+    };
 
-            None
-        }
+    if config.json_format {
+        tracing_subscriber::registry()
+            .with(filter)
+            .with(
+                fmt::layer()
+                    .json()
+                    .with_writer(non_blocking)
+                    .with_span_events(FmtSpan::CLOSE),
+            )
+            .init();
+    } else {
+        tracing_subscriber::registry()
+            .with(filter)
+            .with(
+                fmt::layer()
+                    .with_writer(non_blocking)
+                    .with_span_events(FmtSpan::CLOSE),
+            )
+            .init();
     }
+
+    guard
 }
 
 pub fn parse_log_level(s: &str) -> Result<Level, String> {

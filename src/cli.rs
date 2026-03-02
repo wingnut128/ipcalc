@@ -32,20 +32,6 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
-    /// Calculate IPv4 subnet information [DEPRECATED: use 'ipcalc <cidr>' instead]
-    #[command(name = "v4", hide = true)]
-    Ipv4 {
-        /// IPv4 address in CIDR notation (e.g., 192.168.1.0/24)
-        cidr: String,
-    },
-
-    /// Calculate IPv6 subnet/prefix information [DEPRECATED: use 'ipcalc <cidr>' instead]
-    #[command(name = "v6", hide = true)]
-    Ipv6 {
-        /// IPv6 address with prefix (e.g., 2001:db8:abcd::/48)
-        cidr: String,
-    },
-
     /// Generate subnets from a supernet
     Split {
         /// Network in CIDR notation (or prefix notation for IPv6)

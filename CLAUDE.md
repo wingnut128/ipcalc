@@ -86,8 +86,8 @@ make fuzz                                      # Run fuzz_cidr_parsing for 60s
 make fuzz FUZZ_TARGET=fuzz_contains FUZZ_DURATION=30  # Run specific target
 
 # CLI usage
-ipcalc v4 192.168.1.0/24              # IPv4 subnet info
-ipcalc v6 2001:db8::/48               # IPv6 prefix info
+ipcalc 192.168.1.0/24                  # IPv4 subnet info
+ipcalc 2001:db8::/48                   # IPv6 prefix info
 ipcalc split 10.0.0.0/8 -p 16 -n 10   # Generate 10 /16 subnets
 ipcalc split 10.0.0.0/8 -p 16 --max   # Generate all possible /16 subnets
 ```

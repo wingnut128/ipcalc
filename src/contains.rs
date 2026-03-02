@@ -1,6 +1,6 @@
 use crate::error::{IpCalcError, Result};
-use crate::ipv4::Ipv4Subnet;
-use crate::ipv6::Ipv6Subnet;
+use crate::ipv4::{Ipv4Subnet, ipv4_mask};
+use crate::ipv6::{Ipv6Subnet, ipv6_mask};
 use serde::Serialize;
 use std::net::{Ipv4Addr, Ipv6Addr};
 use std::str::FromStr;
@@ -23,11 +23,7 @@ pub fn check_ipv4_contains(cidr: &str, address: &str) -> Result<ContainsResult> 
 
     let addr_u32 = u32::from(addr);
     let network_u32 = u32::from(subnet.network);
-    let mask = if subnet.prefix_length == 0 {
-        0
-    } else {
-        !0u32 << (32 - subnet.prefix_length)
-    };
+    let mask = ipv4_mask(subnet.prefix_length);
 
     let contained = (addr_u32 & mask) == (network_u32 & mask);
 
@@ -48,11 +44,7 @@ pub fn check_ipv6_contains(cidr: &str, address: &str) -> Result<ContainsResult> 
 
     let addr_u128 = u128::from(addr);
     let network_u128 = u128::from(subnet.network);
-    let mask = if subnet.prefix_length == 0 {
-        0
-    } else {
-        !0u128 << (128 - subnet.prefix_length)
-    };
+    let mask = ipv6_mask(subnet.prefix_length);
 
     let contained = (addr_u128 & mask) == (network_u128 & mask);
 

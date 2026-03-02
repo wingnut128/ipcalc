@@ -21,6 +21,16 @@ pub struct Ipv6Subnet {
     pub address_type: String,
 }
 
+/// Compute the IPv6 subnet mask for a given prefix length.
+/// Prefix must be 0..=128; values outside this range produce meaningless results.
+pub fn ipv6_mask(prefix: u8) -> u128 {
+    if prefix == 0 {
+        0
+    } else {
+        !0u128 << (128 - prefix)
+    }
+}
+
 const MAX_INPUT_LENGTH: usize = 256;
 
 impl Ipv6Subnet {
@@ -51,11 +61,7 @@ impl Ipv6Subnet {
         }
 
         let addr_u128 = u128::from(addr);
-        let mask = if prefix == 0 {
-            0
-        } else {
-            !0u128 << (128 - prefix)
-        };
+        let mask = ipv6_mask(prefix);
 
         let network = addr_u128 & mask;
         let last = network | !mask;

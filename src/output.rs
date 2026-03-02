@@ -200,67 +200,50 @@ impl TextOutput for SplitSummary {
     }
 }
 
-impl TextOutput for Ipv4SummaryResult {
-    fn to_text(&self) -> String {
-        let mut out = String::new();
-        writeln!(out, "CIDR Summarization").unwrap();
-        writeln!(out, "==================").unwrap();
-        writeln!(out, "Input CIDRs:   {}", self.input_count).unwrap();
-        writeln!(out, "Output CIDRs:  {}", self.output_count).unwrap();
-        writeln!(out).unwrap();
-        for (i, cidr) in self.cidrs.iter().enumerate() {
-            writeln!(out, "  {}. {}/{}", i + 1, cidr.network, cidr.prefix_length).unwrap();
+macro_rules! impl_summary_text_output {
+    ($ty:ty) => {
+        impl TextOutput for $ty {
+            fn to_text(&self) -> String {
+                let mut out = String::new();
+                writeln!(out, "CIDR Summarization").unwrap();
+                writeln!(out, "==================").unwrap();
+                writeln!(out, "Input CIDRs:   {}", self.input_count).unwrap();
+                writeln!(out, "Output CIDRs:  {}", self.output_count).unwrap();
+                writeln!(out).unwrap();
+                for (i, cidr) in self.cidrs.iter().enumerate() {
+                    writeln!(out, "  {}. {}/{}", i + 1, cidr.network, cidr.prefix_length).unwrap();
+                }
+                out
+            }
         }
-        out
-    }
+    };
 }
 
-impl TextOutput for Ipv6SummaryResult {
-    fn to_text(&self) -> String {
-        let mut out = String::new();
-        writeln!(out, "CIDR Summarization").unwrap();
-        writeln!(out, "==================").unwrap();
-        writeln!(out, "Input CIDRs:   {}", self.input_count).unwrap();
-        writeln!(out, "Output CIDRs:  {}", self.output_count).unwrap();
-        writeln!(out).unwrap();
-        for (i, cidr) in self.cidrs.iter().enumerate() {
-            writeln!(out, "  {}. {}/{}", i + 1, cidr.network, cidr.prefix_length).unwrap();
+impl_summary_text_output!(Ipv4SummaryResult);
+impl_summary_text_output!(Ipv6SummaryResult);
+
+macro_rules! impl_from_range_text_output {
+    ($ty:ty) => {
+        impl TextOutput for $ty {
+            fn to_text(&self) -> String {
+                let mut out = String::new();
+                writeln!(out, "IP Range to CIDR").unwrap();
+                writeln!(out, "=================").unwrap();
+                writeln!(out, "Start Address: {}", self.start_address).unwrap();
+                writeln!(out, "End Address:   {}", self.end_address).unwrap();
+                writeln!(out, "CIDR Count:    {}", self.cidr_count).unwrap();
+                writeln!(out).unwrap();
+                for (i, cidr) in self.cidrs.iter().enumerate() {
+                    writeln!(out, "  {}. {}/{}", i + 1, cidr.network, cidr.prefix_length).unwrap();
+                }
+                out
+            }
         }
-        out
-    }
+    };
 }
 
-impl TextOutput for Ipv4FromRangeResult {
-    fn to_text(&self) -> String {
-        let mut out = String::new();
-        writeln!(out, "IP Range to CIDR").unwrap();
-        writeln!(out, "=================").unwrap();
-        writeln!(out, "Start Address: {}", self.start_address).unwrap();
-        writeln!(out, "End Address:   {}", self.end_address).unwrap();
-        writeln!(out, "CIDR Count:    {}", self.cidr_count).unwrap();
-        writeln!(out).unwrap();
-        for (i, cidr) in self.cidrs.iter().enumerate() {
-            writeln!(out, "  {}. {}/{}", i + 1, cidr.network, cidr.prefix_length).unwrap();
-        }
-        out
-    }
-}
-
-impl TextOutput for Ipv6FromRangeResult {
-    fn to_text(&self) -> String {
-        let mut out = String::new();
-        writeln!(out, "IP Range to CIDR").unwrap();
-        writeln!(out, "=================").unwrap();
-        writeln!(out, "Start Address: {}", self.start_address).unwrap();
-        writeln!(out, "End Address:   {}", self.end_address).unwrap();
-        writeln!(out, "CIDR Count:    {}", self.cidr_count).unwrap();
-        writeln!(out).unwrap();
-        for (i, cidr) in self.cidrs.iter().enumerate() {
-            writeln!(out, "  {}. {}/{}", i + 1, cidr.network, cidr.prefix_length).unwrap();
-        }
-        out
-    }
-}
+impl_from_range_text_output!(Ipv4FromRangeResult);
+impl_from_range_text_output!(Ipv6FromRangeResult);
 
 impl TextOutput for BatchResult {
     fn to_text(&self) -> String {

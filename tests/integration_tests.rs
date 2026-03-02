@@ -38,7 +38,7 @@ fn run_ipcalc_stdin(args: &[&str], input: &str) -> (String, String, bool) {
 
 #[test]
 fn test_ipv4_json_output() {
-    let (stdout, _, success) = run_ipcalc(&["v4", "192.168.1.0/24"]);
+    let (stdout, _, success) = run_ipcalc(&["192.168.1.0/24"]);
     assert!(success);
 
     let json: serde_json::Value = serde_json::from_str(&stdout).expect("Invalid JSON");
@@ -51,7 +51,7 @@ fn test_ipv4_json_output() {
 
 #[test]
 fn test_ipv4_text_output() {
-    let (stdout, _, success) = run_ipcalc(&["v4", "10.0.0.0/8", "--format", "text"]);
+    let (stdout, _, success) = run_ipcalc(&["10.0.0.0/8", "--format", "text"]);
     assert!(success);
     assert!(stdout.contains("IPv4 Subnet Calculator"));
     assert!(stdout.contains("Network Address:   10.0.0.0"));
@@ -61,7 +61,7 @@ fn test_ipv4_text_output() {
 
 #[test]
 fn test_ipv6_json_output() {
-    let (stdout, _, success) = run_ipcalc(&["v6", "2001:db8::/32"]);
+    let (stdout, _, success) = run_ipcalc(&["2001:db8::/32"]);
     assert!(success);
 
     let json: serde_json::Value = serde_json::from_str(&stdout).expect("Invalid JSON");
@@ -72,7 +72,7 @@ fn test_ipv6_json_output() {
 
 #[test]
 fn test_ipv6_text_output() {
-    let (stdout, _, success) = run_ipcalc(&["v6", "fe80::1/64", "--format", "text"]);
+    let (stdout, _, success) = run_ipcalc(&["fe80::1/64", "--format", "text"]);
     assert!(success);
     assert!(stdout.contains("IPv6 Subnet Calculator"));
     assert!(stdout.contains("Link-Local Unicast (RFC 4291)"));
@@ -103,14 +103,14 @@ fn test_split_ipv6() {
 
 #[test]
 fn test_invalid_ipv4() {
-    let (_, stderr, success) = run_ipcalc(&["v4", "999.999.999.999/24"]);
+    let (_, stderr, success) = run_ipcalc(&["999.999.999.999/24"]);
     assert!(!success);
     assert!(stderr.contains("Error"));
 }
 
 #[test]
 fn test_invalid_prefix() {
-    let (_, stderr, success) = run_ipcalc(&["v4", "192.168.1.0/33"]);
+    let (_, stderr, success) = run_ipcalc(&["192.168.1.0/33"]);
     assert!(!success);
     assert!(stderr.contains("Error"));
 }
@@ -118,7 +118,7 @@ fn test_invalid_prefix() {
 #[test]
 fn test_file_output() {
     let temp_file = "/tmp/ipcalc_test_output.json";
-    let (_, _, success) = run_ipcalc(&["v4", "172.16.0.0/12", "-o", temp_file]);
+    let (_, _, success) = run_ipcalc(&["172.16.0.0/12", "-o", temp_file]);
     assert!(success);
 
     let content = std::fs::read_to_string(temp_file).expect("Failed to read output file");
@@ -196,26 +196,6 @@ fn test_direct_ipv4_text_format() {
     assert!(success);
     assert!(stdout.contains("IPv4 Subnet Calculator"));
     assert!(stdout.contains("Network Address:   10.0.0.0"));
-}
-
-#[test]
-fn test_v4_deprecation_warning() {
-    let (stdout, stderr, success) = run_ipcalc(&["v4", "192.168.1.0/24"]);
-    assert!(success);
-    assert!(stderr.contains("deprecated"));
-    // Verify it still works
-    let json: serde_json::Value = serde_json::from_str(&stdout).expect("Invalid JSON");
-    assert_eq!(json["network_address"], "192.168.1.0");
-}
-
-#[test]
-fn test_v6_deprecation_warning() {
-    let (stdout, stderr, success) = run_ipcalc(&["v6", "2001:db8::/32"]);
-    assert!(success);
-    assert!(stderr.contains("deprecated"));
-    // Verify it still works
-    let json: serde_json::Value = serde_json::from_str(&stdout).expect("Invalid JSON");
-    assert_eq!(json["network_address"], "2001:db8::");
 }
 
 #[test]

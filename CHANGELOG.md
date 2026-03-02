@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-03-02
+
 ### Added
 
 - `make semgrep` target for security scanning with Semgrep (p/owasp-top-ten and p/rust rulesets)
@@ -24,6 +26,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI: added `mcp-server` job with TypeScript lint, build, and test steps
 - CodeQL: added `javascript-typescript` to language scanning matrix
 - CodeQL: upgraded `github/codeql-action` from v3 to v4 ahead of v3 deprecation
+
+### Removed
+
+- **BREAKING**: Removed deprecated `v4` and `v6` CLI subcommands — use `ipcalc <cidr>` directly (deprecated since v0.1.7)
+- Removed unused `tower_governor` dependency from `Cargo.toml`
+
+### Refactored
+
+- Extracted `ipv4_mask()` and `ipv6_mask()` helpers to eliminate duplicated mask calculation across `ipv4.rs`, `ipv6.rs`, `contains.rs`, and `summarize.rs`
+- Deduplicated `TextOutput` implementations for `SummaryResult` and `FromRangeResult` pairs via macros
+- Simplified `logging.rs` initialization from 4 near-identical subscriber blocks to 2 (JSON vs plain) with shared writer setup
+- Extracted `handle_result` helper in `main.rs` to collapse 10 repetitive match/Ok/Err blocks
+- Unified `count_subnets` IPv4/IPv6 branches into a single validation flow in `subnet_generator.rs`
+- Extracted `validate_and_summarize` helper to deduplicate `summarize_ipv4_with_limit` / `summarize_ipv6_with_limit`
+- Simplified `init_logging` return type from `Option<WorkerGuard>` to `WorkerGuard`
 
 ## [0.11.0] - 2026-02-25
 
@@ -341,7 +358,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dockerfile for containerized deployment
 - Makefile for common development tasks
 
-[Unreleased]: https://github.com/wingnut128/ipcalc/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/wingnut128/ipcalc/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/wingnut128/ipcalc/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/wingnut128/ipcalc/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/wingnut128/ipcalc/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/wingnut128/ipcalc/compare/v0.8.1...v0.9.0
