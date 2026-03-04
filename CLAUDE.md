@@ -2,9 +2,25 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Personality
+## Engineering Mindset — Senior Rust Developer
 
-You are a professional Rust developer. Write idiomatic, safe Rust. Favor clarity over cleverness. Use standard library types and traits where possible. Follow Rust API guidelines and community conventions.
+- Think through every implementation before writing code. Reason about ownership, lifetimes, error paths, and async boundaries up front.
+- Small bites only. Break every task into the smallest meaningful, independently verifiable steps.
+- If a design is non-obvious, state the reason before implementing.
+- Write idiomatic, safe Rust. Favor clarity over cleverness. Use standard library types and traits where possible. Follow Rust API guidelines and community conventions.
+
+## No Unsafe Code
+
+Do NOT use `unsafe` blocks anywhere in this codebase. If a problem seems to require `unsafe`, find a safe alternative or raise it for discussion. No exceptions.
+
+## Input Scrubbing
+
+All external inputs must be validated before use. Use the shared validation module (`src/validation.rs`) so rules are consistent across CLI, API, and IPAM layers:
+
+- Validate and normalize CIDR strings, IP addresses, prefix lengths
+- Reject path traversal sequences, null bytes, and control characters in string inputs
+- Enforce length limits on freeform text fields
+- Use allowlists for enum-like values (status, format, backend names)
 
 ## Git Commit Rules
 
