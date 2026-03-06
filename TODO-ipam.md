@@ -112,3 +112,4 @@ Branch: `feat/ipam-persistence-layer`
 - [ ] IPv6 IPAM implementation (schema supports it, code is IPv4-only for v1)
 - [ ] Reservation TTL/expiry — deferred to v2
 - [x] Replace Node.js MCP server with Rust-native implementation using `rmcp` (official Rust SDK) — eliminates Node dependency, reduces supply-chain attack surface, calls library functions directly
+- [ ] MCP server remote backend option — add a configuration flag (e.g. `--api-url`) so the MCP server can proxy tool calls to a running `ipcalc serve` HTTP API instead of calling local library functions directly. Useful when the MCP server runs on a different host or when IPAM state must be shared across clients.

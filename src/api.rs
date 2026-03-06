@@ -76,6 +76,7 @@ pub struct ApiDoc;
 #[derive(Default)]
 pub struct RouterConfig {
     pub server: ServerConfig,
+    pub ipam_ops: Option<Arc<crate::ipam::operations::IpamOps>>,
 }
 
 #[derive(Deserialize)]
@@ -290,6 +291,14 @@ pub fn create_router(config: RouterConfig) -> Router {
         .route("/v4/from-range", get(from_range_ipv4_handler))
         .route("/v6/from-range", get(from_range_ipv6_handler))
         .route("/batch", post(batch_handler));
+
+    // Conditionally mount IPAM routes
+    let router = if let Some(ops) = config.ipam_ops {
+        let ipam_router = crate::ipam_api::create_ipam_router().layer(Extension(ops));
+        router.nest("/ipam", ipam_router)
+    } else {
+        router
+    };
 
     #[cfg(feature = "swagger")]
     let router = if config.server.enable_swagger {

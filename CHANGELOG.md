@@ -28,6 +28,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `ipam utilization` / `ipam free-blocks` — capacity reporting
   - `ipam find-ip` / `ipam find-resource` — reverse lookup
   - `ipam audit` — query the immutable audit log
+- IPAM REST API endpoints via `ipcalc serve --ipam-enabled`:
+  - `POST /ipam/supernets` — create supernet; `GET` — list all
+  - `GET /ipam/supernets/{id}` — get supernet; `DELETE` — delete (guarded by active allocations)
+  - `POST /ipam/supernets/{id}/allocate` — auto-allocate next-available blocks
+  - `POST /ipam/supernets/{id}/allocate-specific` — allocate a specific CIDR
+  - `GET /ipam/supernets/{id}/allocations` — list allocations with filters
+  - `GET /ipam/supernets/{id}/free` — free block discovery
+  - `GET /ipam/supernets/{id}/utilization` — utilization report
+  - `GET /ipam/allocations/{id}` — get allocation; `PATCH` — update metadata
+  - `POST /ipam/allocations/{id}/release` — release allocation
+  - `PUT /ipam/allocations/{id}/tags` — set tags
+  - `GET /ipam/find-ip/{address}` — reverse lookup by IP
+  - `GET /ipam/find-resource/{resource_id}` — reverse lookup by resource
+  - `GET /ipam/audit` — query audit log
   - `ipam tags get/set` — manage key-value tags on allocations
   - `--db <path>` flag for database location override
   - All output formats supported (JSON, text, CSV, YAML)

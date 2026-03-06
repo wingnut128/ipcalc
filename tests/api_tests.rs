@@ -377,6 +377,7 @@ async fn test_batch_size_exceeded() {
             max_batch_size: 2,
             ..Default::default()
         },
+        ..Default::default()
     };
 
     // 3 CIDRs with max_batch_size=2 should fail
@@ -426,6 +427,7 @@ async fn test_body_size_limit() {
             max_body_size: 64,
             ..Default::default()
         },
+        ..Default::default()
     };
 
     let app = create_router(config);

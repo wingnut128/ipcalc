@@ -21,7 +21,7 @@ A fast IPv4 and IPv6 subnet calculator written in Rust. Available as a CLI tool,
 - **HTTP API**: REST endpoints for all calculations
 - **OpenAPI documentation**: Machine-readable API specification for easy integration with tools like Swagger Editor, Postman, and Insomnia
 - **MCP server**: [Model Context Protocol](https://modelcontextprotocol.io) server for AI assistant integration (Claude, etc.) over stdio
-- **IPAM (IP Address Management)**: allocation tracking with conflict detection, audit trail, and utilization reporting (library-level; CLI/API integration coming soon)
+- **IPAM (IP Address Management)**: allocation tracking with conflict detection, audit trail, and utilization reporting — available via CLI (`ipcalc ipam`) and REST API (`ipcalc serve --ipam-enabled`)
 - **Configurable security**: rate limiting, request size limits, timeouts, restrictive CORS, and security headers
 - **TOML configuration**: server settings via config file with CLI flag overrides
 
@@ -555,7 +555,38 @@ ipcalc ipam --db /path/to/my.db supernet list
 
 **Database location** (precedence order): `--db` flag > `IPCALC_DB` env var > `db_path` in config file > `~/.local/share/ipcalc/ipcalc.db`
 
-**Status:** CLI integration complete. API endpoints and MCP tool integration are planned for the next release.
+**REST API:**
+
+Enable IPAM endpoints on the HTTP server with `--ipam-enabled`:
+
+```bash
+# Start server with IPAM enabled
+ipcalc serve --ipam-enabled
+
+# Use a specific database file
+ipcalc serve --ipam-enabled --ipam-db /path/to/ipam.db
+```
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/ipam/supernets` | `POST` | Create a supernet |
+| `/ipam/supernets` | `GET` | List all supernets |
+| `/ipam/supernets/{id}` | `GET` | Get supernet details |
+| `/ipam/supernets/{id}` | `DELETE` | Delete supernet (must have no active allocations) |
+| `/ipam/supernets/{id}/allocate` | `POST` | Auto-allocate next-available block(s) |
+| `/ipam/supernets/{id}/allocate-specific` | `POST` | Allocate a specific CIDR |
+| `/ipam/supernets/{id}/allocations` | `GET` | List allocations (filterable by status, owner, etc.) |
+| `/ipam/supernets/{id}/free` | `GET` | Find free blocks (optional `?prefix=N` filter) |
+| `/ipam/supernets/{id}/utilization` | `GET` | Utilization report |
+| `/ipam/allocations/{id}` | `GET` | Get allocation details |
+| `/ipam/allocations/{id}` | `PATCH` | Update allocation metadata |
+| `/ipam/allocations/{id}/release` | `POST` | Release an allocation |
+| `/ipam/allocations/{id}/tags` | `PUT` | Set tags on an allocation |
+| `/ipam/find-ip/{address}` | `GET` | Find allocations containing an IP |
+| `/ipam/find-resource/{resource_id}` | `GET` | Find allocations by resource ID |
+| `/ipam/audit` | `GET` | Query audit log (filterable) |
+
+**Status:** CLI and REST API integration complete. MCP tool integration is planned for the next release.
 
 ## License
 
