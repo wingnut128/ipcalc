@@ -216,6 +216,9 @@ async fn main() {
             rate_limit_per_second,
             rate_limit_burst,
             timeout,
+            ipam_enabled,
+            ipam_backend,
+            ipam_db,
         }) => {
             // Parse and validate log level
             let level = match parse_log_level(&log_level) {
@@ -262,6 +265,9 @@ async fn main() {
                 rate_limit_per_second,
                 rate_limit_burst,
                 timeout,
+                ipam_enabled,
+                ipam_backend,
+                ipam_db,
             });
 
             // Bind-address warning
@@ -303,8 +309,23 @@ async fn main() {
                 }
             }
 
+            // Initialize IPAM if enabled
+            let ipam_ops = if server_config.ipam_enabled {
+                use ipcalc::ipam;
+                let ipam_config = ipam::config::IpamConfig::default();
+                let store = ipam::create_store(&ipam_config, server_config.ipam_db.as_deref())
+                    .await
+                    .expect("Failed to initialize IPAM store");
+                info!("IPAM enabled, backend: {}", server_config.ipam_backend);
+                println!("IPAM endpoints enabled at /ipam/");
+                Some(std::sync::Arc::new(ipam::operations::IpamOps::new(store)))
+            } else {
+                None
+            };
+
             let router_config = RouterConfig {
                 server: server_config,
+                ipam_ops,
             };
             let router = create_router(router_config);
 

@@ -148,6 +148,18 @@ pub enum Commands {
         /// Request timeout in seconds (overrides config file)
         #[arg(long)]
         timeout: Option<u64>,
+
+        /// Enable IPAM API routes at /ipam/
+        #[arg(long)]
+        ipam_enabled: bool,
+
+        /// IPAM storage backend (default: sqlite)
+        #[arg(long, default_value = "sqlite")]
+        ipam_backend: Option<String>,
+
+        /// IPAM database path (overrides IPCALC_DB env and config file)
+        #[arg(long)]
+        ipam_db: Option<String>,
     },
 }
 

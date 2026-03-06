@@ -42,8 +42,7 @@ impl SqliteStore {
         Ok(Self { pool })
     }
 
-    /// Create an in-memory store for testing.
-    #[cfg(test)]
+    /// Create an in-memory store (useful for testing).
     pub fn in_memory() -> Result<Self> {
         let manager = SqliteConnectionManager::memory();
         let pool = Pool::builder()

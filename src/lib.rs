@@ -16,6 +16,7 @@ pub mod summarize;
 // I/O and interface modules
 pub mod api;
 pub mod cli;
+pub mod ipam_api;
 pub mod output;
 
 // IPAM persistence layer

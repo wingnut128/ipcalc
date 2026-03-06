@@ -20,6 +20,12 @@ pub struct ServerConfig {
     pub timeout_seconds: u64,
     /// Enable Swagger UI
     pub enable_swagger: bool,
+    /// Enable IPAM API routes
+    pub ipam_enabled: bool,
+    /// IPAM storage backend (currently only "sqlite")
+    pub ipam_backend: String,
+    /// IPAM database path (SQLite)
+    pub ipam_db: Option<String>,
 }
 
 impl Default for ServerConfig {
@@ -33,6 +39,9 @@ impl Default for ServerConfig {
             rate_limit_burst: 50,
             timeout_seconds: 30,
             enable_swagger: false,
+            ipam_enabled: false,
+            ipam_backend: "sqlite".to_string(),
+            ipam_db: None,
         }
     }
 }
@@ -47,6 +56,9 @@ pub struct CliOverrides {
     pub rate_limit_per_second: Option<u64>,
     pub rate_limit_burst: Option<u32>,
     pub timeout: Option<u64>,
+    pub ipam_enabled: bool,
+    pub ipam_backend: Option<String>,
+    pub ipam_db: Option<String>,
 }
 
 impl ServerConfig {
@@ -82,6 +94,15 @@ impl ServerConfig {
         }
         if let Some(v) = overrides.timeout {
             self.timeout_seconds = v;
+        }
+        if overrides.ipam_enabled {
+            self.ipam_enabled = true;
+        }
+        if let Some(ref v) = overrides.ipam_backend {
+            self.ipam_backend = v.clone();
+        }
+        if overrides.ipam_db.is_some() {
+            self.ipam_db.clone_from(&overrides.ipam_db);
         }
     }
 }
