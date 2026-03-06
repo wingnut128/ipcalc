@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::ServerCapabilities;
@@ -7,10 +9,15 @@ use serde::Deserialize;
 
 use crate::contains::{check_ipv4_contains, check_ipv6_contains};
 use crate::from_range::{from_range_ipv4, from_range_ipv6};
+use crate::ipam::operations::IpamOps;
 use crate::ipv4::Ipv4Subnet;
 use crate::ipv6::Ipv6Subnet;
 use crate::subnet_generator::{count_subnets, generate_ipv4_subnets, generate_ipv6_subnets};
 use crate::summarize::{summarize_ipv4, summarize_ipv6};
+
+// ---------------------------------------------------------------------------
+// Parameter types — calculator tools
+// ---------------------------------------------------------------------------
 
 #[derive(Debug, Deserialize, JsonSchema)]
 struct SubnetCalcParams {
@@ -52,22 +59,117 @@ struct SummarizeParams {
     cidrs: Vec<String>,
 }
 
+// ---------------------------------------------------------------------------
+// Parameter types — IPAM tools
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Deserialize, JsonSchema)]
+struct IpamCreateSupernetParams {
+    /// CIDR notation for the supernet, e.g. 10.0.0.0/8 or 2001:db8::/32
+    cidr: String,
+    /// Optional name for the supernet
+    name: Option<String>,
+    /// Optional description
+    description: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+struct IpamListSupernetsParams {}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+struct IpamAllocateParams {
+    /// Supernet ID to allocate from
+    supernet_id: String,
+    /// Desired prefix length for the allocation
+    prefix_length: u8,
+    /// Number of blocks to allocate (default: 1)
+    count: Option<u32>,
+    /// Human-readable name
+    name: Option<String>,
+    /// Environment (e.g., production, staging)
+    environment: Option<String>,
+    /// Owner
+    owner: Option<String>,
+    /// External resource identifier
+    resource_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+struct IpamAllocateSpecificParams {
+    /// Supernet ID to allocate within
+    supernet_id: String,
+    /// Specific CIDR to allocate, e.g. 10.0.1.0/24
+    cidr: String,
+    /// Human-readable name
+    name: Option<String>,
+    /// Environment (e.g., production, staging)
+    environment: Option<String>,
+    /// Owner
+    owner: Option<String>,
+    /// External resource identifier
+    resource_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+struct IpamReleaseParams {
+    /// Allocation ID to release
+    allocation_id: String,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+struct IpamListAllocationsParams {
+    /// Supernet ID to list allocations for
+    supernet_id: String,
+    /// Filter by status (active, reserved, released)
+    status: Option<String>,
+    /// Filter by environment
+    environment: Option<String>,
+    /// Filter by owner
+    owner: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+struct IpamFreeBlocksParams {
+    /// Supernet ID to check for free space
+    supernet_id: String,
+    /// Filter by minimum prefix length
+    prefix: Option<u8>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+struct IpamUtilizationParams {
+    /// Supernet ID to get utilization for
+    supernet_id: String,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+struct IpamFindIpParams {
+    /// IP address to look up, e.g. 10.0.1.50 or 2001:db8::1
+    address: String,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+struct IpamFindResourceParams {
+    /// Resource ID to look up
+    resource_id: String,
+}
+
+// ---------------------------------------------------------------------------
+// MCP server
+// ---------------------------------------------------------------------------
+
 #[derive(Debug, Clone)]
 pub struct IpCalcMcp {
     tool_router: ToolRouter<Self>,
+    ipam_ops: Option<Arc<IpamOps>>,
 }
 
 impl IpCalcMcp {
-    pub fn new() -> Self {
+    pub fn new(ipam_ops: Option<Arc<IpamOps>>) -> Self {
         Self {
             tool_router: Self::tool_router(),
+            ipam_ops,
         }
-    }
-}
-
-impl Default for IpCalcMcp {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -82,8 +184,15 @@ fn result_to_string<T: serde::Serialize>(result: crate::error::Result<T>) -> Str
     }
 }
 
+const IPAM_NOT_ENABLED: &str =
+    "Error: IPAM is not enabled. Start the MCP server with --ipam-db <path> to enable IPAM tools.";
+
 #[tool_router]
 impl IpCalcMcp {
+    // -------------------------------------------------------------------
+    // Calculator tools
+    // -------------------------------------------------------------------
+
     #[tool(
         name = "subnet_calc",
         description = "Calculate IPv4 or IPv6 subnet details from CIDR notation. Returns network address, broadcast, mask, host range, total/usable hosts, network class (IPv4), address type, and more."
@@ -172,6 +281,182 @@ impl IpCalcMcp {
             result_to_string(summarize_ipv4(&params.cidrs))
         }
     }
+
+    // -------------------------------------------------------------------
+    // IPAM tools
+    // -------------------------------------------------------------------
+
+    #[tool(
+        name = "ipam_create_supernet",
+        description = "Create a new IPAM supernet (top-level address space). Returns the created supernet with its ID. Rejects overlapping supernets."
+    )]
+    async fn ipam_create_supernet(
+        &self,
+        Parameters(params): Parameters<IpamCreateSupernetParams>,
+    ) -> String {
+        let Some(ops) = &self.ipam_ops else {
+            return IPAM_NOT_ENABLED.to_string();
+        };
+        let input = crate::ipam::models::CreateSupernet {
+            cidr: params.cidr,
+            name: params.name,
+            description: params.description,
+        };
+        result_to_string(ops.create_supernet(&input).await)
+    }
+
+    #[tool(
+        name = "ipam_list_supernets",
+        description = "List all IPAM supernets. Returns an array of supernets with their IDs, CIDRs, and metadata."
+    )]
+    async fn ipam_list_supernets(
+        &self,
+        Parameters(_params): Parameters<IpamListSupernetsParams>,
+    ) -> String {
+        let Some(ops) = &self.ipam_ops else {
+            return IPAM_NOT_ENABLED.to_string();
+        };
+        result_to_string(ops.list_supernets().await)
+    }
+
+    #[tool(
+        name = "ipam_allocate",
+        description = "Auto-allocate the next available CIDR block(s) from a supernet. Specify the desired prefix length and optional count. Returns the created allocation(s)."
+    )]
+    async fn ipam_allocate(&self, Parameters(params): Parameters<IpamAllocateParams>) -> String {
+        let Some(ops) = &self.ipam_ops else {
+            return IPAM_NOT_ENABLED.to_string();
+        };
+        let request = crate::ipam::models::AutoAllocateRequest {
+            supernet_id: params.supernet_id,
+            prefix_length: params.prefix_length,
+            count: params.count,
+            status: None,
+            resource_id: params.resource_id,
+            resource_type: None,
+            name: params.name,
+            description: None,
+            environment: params.environment,
+            owner: params.owner,
+            parent_allocation_id: None,
+            tags: None,
+        };
+        result_to_string(ops.allocate_auto(&request).await)
+    }
+
+    #[tool(
+        name = "ipam_allocate_specific",
+        description = "Allocate a specific CIDR block from a supernet. Rejects if the block overlaps with existing allocations."
+    )]
+    async fn ipam_allocate_specific(
+        &self,
+        Parameters(params): Parameters<IpamAllocateSpecificParams>,
+    ) -> String {
+        let Some(ops) = &self.ipam_ops else {
+            return IPAM_NOT_ENABLED.to_string();
+        };
+        let input = crate::ipam::models::CreateAllocation {
+            supernet_id: params.supernet_id,
+            cidr: params.cidr,
+            status: None,
+            resource_id: params.resource_id,
+            resource_type: None,
+            name: params.name,
+            description: None,
+            environment: params.environment,
+            owner: params.owner,
+            parent_allocation_id: None,
+            tags: None,
+        };
+        result_to_string(ops.allocate_specific(&input).await)
+    }
+
+    #[tool(
+        name = "ipam_release",
+        description = "Release an IPAM allocation, marking it as released and freeing the address space for future use."
+    )]
+    async fn ipam_release(&self, Parameters(params): Parameters<IpamReleaseParams>) -> String {
+        let Some(ops) = &self.ipam_ops else {
+            return IPAM_NOT_ENABLED.to_string();
+        };
+        result_to_string(ops.release_allocation(&params.allocation_id).await)
+    }
+
+    #[tool(
+        name = "ipam_list_allocations",
+        description = "List allocations within a supernet. Optionally filter by status, environment, or owner."
+    )]
+    async fn ipam_list_allocations(
+        &self,
+        Parameters(params): Parameters<IpamListAllocationsParams>,
+    ) -> String {
+        let Some(ops) = &self.ipam_ops else {
+            return IPAM_NOT_ENABLED.to_string();
+        };
+        let status = params.status.and_then(|s| s.parse().ok());
+        let filter = crate::ipam::models::AllocationFilter {
+            supernet_id: Some(params.supernet_id),
+            status,
+            resource_id: None,
+            resource_type: None,
+            environment: params.environment,
+            owner: params.owner,
+        };
+        result_to_string(ops.list_allocations(&filter).await)
+    }
+
+    #[tool(
+        name = "ipam_free_blocks",
+        description = "Find free (unallocated) CIDR blocks within a supernet. Optionally filter by minimum prefix length."
+    )]
+    async fn ipam_free_blocks(
+        &self,
+        Parameters(params): Parameters<IpamFreeBlocksParams>,
+    ) -> String {
+        let Some(ops) = &self.ipam_ops else {
+            return IPAM_NOT_ENABLED.to_string();
+        };
+        result_to_string(ops.free_blocks(&params.supernet_id, params.prefix).await)
+    }
+
+    #[tool(
+        name = "ipam_utilization",
+        description = "Get utilization statistics for a supernet: total addresses, allocated addresses, free addresses, and utilization percentage."
+    )]
+    async fn ipam_utilization(
+        &self,
+        Parameters(params): Parameters<IpamUtilizationParams>,
+    ) -> String {
+        let Some(ops) = &self.ipam_ops else {
+            return IPAM_NOT_ENABLED.to_string();
+        };
+        result_to_string(ops.utilization(&params.supernet_id).await)
+    }
+
+    #[tool(
+        name = "ipam_find_ip",
+        description = "Find all IPAM allocations that contain a given IP address. Returns matching allocations across all supernets."
+    )]
+    async fn ipam_find_ip(&self, Parameters(params): Parameters<IpamFindIpParams>) -> String {
+        let Some(ops) = &self.ipam_ops else {
+            return IPAM_NOT_ENABLED.to_string();
+        };
+        result_to_string(ops.find_by_ip(&params.address).await)
+    }
+
+    #[tool(
+        name = "ipam_find_resource",
+        description = "Find all IPAM allocations associated with a given resource ID."
+    )]
+    async fn ipam_find_resource(
+        &self,
+        Parameters(params): Parameters<IpamFindResourceParams>,
+    ) -> String {
+        let Some(ops) = &self.ipam_ops else {
+            return IPAM_NOT_ENABLED.to_string();
+        };
+        result_to_string(ops.find_by_resource(&params.resource_id).await)
+    }
 }
 
 #[tool_handler]
@@ -185,8 +470,16 @@ impl ServerHandler for IpCalcMcp {
     }
 }
 
-pub async fn run_mcp_server() -> crate::error::Result<()> {
-    let server = IpCalcMcp::new();
+pub async fn run_mcp_server(ipam_db: Option<&str>) -> crate::error::Result<()> {
+    let ipam_ops = if let Some(db) = ipam_db {
+        let config = crate::ipam::config::IpamConfig::default();
+        let store = crate::ipam::create_store(&config, Some(db)).await?;
+        Some(Arc::new(IpamOps::new(store)))
+    } else {
+        None
+    };
+
+    let server = IpCalcMcp::new(ipam_ops);
     let transport = rmcp::transport::io::stdio();
     let service = server
         .serve(transport)
@@ -203,6 +496,23 @@ pub async fn run_mcp_server() -> crate::error::Result<()> {
 mod tests {
     use super::*;
 
+    fn calc_server() -> IpCalcMcp {
+        IpCalcMcp::new(None)
+    }
+
+    async fn ipam_server() -> IpCalcMcp {
+        use crate::ipam::store::IpamStore;
+        let store = crate::ipam::sqlite::SqliteStore::in_memory().expect("in-memory store");
+        store.initialize().await.expect("init");
+        store.migrate().await.expect("migrate");
+        let ops = Arc::new(IpamOps::new(Arc::new(store)));
+        IpCalcMcp::new(Some(ops))
+    }
+
+    // -------------------------------------------------------------------
+    // Calculator tool tests
+    // -------------------------------------------------------------------
+
     #[test]
     fn test_is_ipv6() {
         assert!(is_ipv6("2001:db8::/32"));
@@ -213,7 +523,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_subnet_calc_ipv4() {
-        let server = IpCalcMcp::new();
+        let server = calc_server();
         let result = server
             .subnet_calc(Parameters(SubnetCalcParams {
                 cidr: "192.168.1.0/24".into(),
@@ -226,7 +536,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_subnet_calc_ipv6() {
-        let server = IpCalcMcp::new();
+        let server = calc_server();
         let result = server
             .subnet_calc(Parameters(SubnetCalcParams {
                 cidr: "2001:db8::/48".into(),
@@ -238,7 +548,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_subnet_calc_invalid() {
-        let server = IpCalcMcp::new();
+        let server = calc_server();
         let result = server
             .subnet_calc(Parameters(SubnetCalcParams {
                 cidr: "not-a-cidr".into(),
@@ -249,7 +559,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_subnet_split_with_count() {
-        let server = IpCalcMcp::new();
+        let server = calc_server();
         let result = server
             .subnet_split(Parameters(SubnetSplitParams {
                 cidr: "10.0.0.0/8".into(),
@@ -264,7 +574,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_subnet_split_with_max() {
-        let server = IpCalcMcp::new();
+        let server = calc_server();
         let result = server
             .subnet_split(Parameters(SubnetSplitParams {
                 cidr: "192.168.0.0/24".into(),
@@ -279,7 +589,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_subnet_split_no_count_no_max() {
-        let server = IpCalcMcp::new();
+        let server = calc_server();
         let result = server
             .subnet_split(Parameters(SubnetSplitParams {
                 cidr: "10.0.0.0/8".into(),
@@ -294,7 +604,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_contains_check_ipv4_contained() {
-        let server = IpCalcMcp::new();
+        let server = calc_server();
         let result = server
             .contains_check(Parameters(ContainsCheckParams {
                 cidr: "192.168.1.0/24".into(),
@@ -307,7 +617,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_contains_check_ipv4_not_contained() {
-        let server = IpCalcMcp::new();
+        let server = calc_server();
         let result = server
             .contains_check(Parameters(ContainsCheckParams {
                 cidr: "192.168.1.0/24".into(),
@@ -319,7 +629,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_contains_check_ipv6() {
-        let server = IpCalcMcp::new();
+        let server = calc_server();
         let result = server
             .contains_check(Parameters(ContainsCheckParams {
                 cidr: "2001:db8::/32".into(),
@@ -331,7 +641,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_from_range_ipv4() {
-        let server = IpCalcMcp::new();
+        let server = calc_server();
         let result = server
             .from_range(Parameters(FromRangeParams {
                 start: "192.168.1.0".into(),
@@ -344,7 +654,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_from_range_ipv6() {
-        let server = IpCalcMcp::new();
+        let server = calc_server();
         let result = server
             .from_range(Parameters(FromRangeParams {
                 start: "2001:db8::".into(),
@@ -357,7 +667,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_summarize_ipv4() {
-        let server = IpCalcMcp::new();
+        let server = calc_server();
         let result = server
             .summarize(Parameters(SummarizeParams {
                 cidrs: vec!["192.168.0.0/24".into(), "192.168.1.0/24".into()],
@@ -369,7 +679,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_summarize_ipv6() {
-        let server = IpCalcMcp::new();
+        let server = calc_server();
         let result = server
             .summarize(Parameters(SummarizeParams {
                 cidrs: vec!["2001:db8::/48".into(), "2001:db8:1::/48".into()],
@@ -380,9 +690,281 @@ mod tests {
 
     #[tokio::test]
     async fn test_summarize_empty() {
-        let server = IpCalcMcp::new();
+        let server = calc_server();
         let result = server
             .summarize(Parameters(SummarizeParams { cidrs: vec![] }))
+            .await;
+        assert!(result.starts_with("Error"));
+    }
+
+    // -------------------------------------------------------------------
+    // IPAM tool tests — disabled
+    // -------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_ipam_tools_disabled() {
+        let server = calc_server(); // no IPAM
+        let result = server
+            .ipam_list_supernets(Parameters(IpamListSupernetsParams {}))
+            .await;
+        assert!(result.contains("IPAM is not enabled"));
+    }
+
+    // -------------------------------------------------------------------
+    // IPAM tool tests — enabled
+    // -------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_ipam_create_and_list_supernets() {
+        let server = ipam_server().await;
+        let result = server
+            .ipam_create_supernet(Parameters(IpamCreateSupernetParams {
+                cidr: "10.0.0.0/8".into(),
+                name: Some("Corp".into()),
+                description: None,
+            }))
+            .await;
+        assert!(!result.starts_with("Error"), "create failed: {result}");
+        assert!(result.contains("10.0.0.0/8"));
+
+        let result = server
+            .ipam_list_supernets(Parameters(IpamListSupernetsParams {}))
+            .await;
+        assert!(!result.starts_with("Error"));
+        assert!(result.contains("10.0.0.0/8"));
+    }
+
+    #[tokio::test]
+    async fn test_ipam_allocate_and_list() {
+        let server = ipam_server().await;
+
+        // Create supernet
+        let result = server
+            .ipam_create_supernet(Parameters(IpamCreateSupernetParams {
+                cidr: "10.0.0.0/8".into(),
+                name: None,
+                description: None,
+            }))
+            .await;
+        let supernet: serde_json::Value = serde_json::from_str(&result).unwrap();
+        let sn_id = supernet["id"].as_str().unwrap().to_string();
+
+        // Auto-allocate
+        let result = server
+            .ipam_allocate(Parameters(IpamAllocateParams {
+                supernet_id: sn_id.clone(),
+                prefix_length: 24,
+                count: Some(2),
+                name: Some("test".into()),
+                environment: None,
+                owner: None,
+                resource_id: None,
+            }))
+            .await;
+        assert!(!result.starts_with("Error"), "allocate failed: {result}");
+
+        // List allocations
+        let result = server
+            .ipam_list_allocations(Parameters(IpamListAllocationsParams {
+                supernet_id: sn_id,
+                status: None,
+                environment: None,
+                owner: None,
+            }))
+            .await;
+        assert!(!result.starts_with("Error"));
+        let allocs: Vec<serde_json::Value> = serde_json::from_str(&result).unwrap();
+        assert_eq!(allocs.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_ipam_allocate_specific_and_release() {
+        let server = ipam_server().await;
+
+        let result = server
+            .ipam_create_supernet(Parameters(IpamCreateSupernetParams {
+                cidr: "10.0.0.0/8".into(),
+                name: None,
+                description: None,
+            }))
+            .await;
+        let supernet: serde_json::Value = serde_json::from_str(&result).unwrap();
+        let sn_id = supernet["id"].as_str().unwrap().to_string();
+
+        // Allocate specific
+        let result = server
+            .ipam_allocate_specific(Parameters(IpamAllocateSpecificParams {
+                supernet_id: sn_id,
+                cidr: "10.0.1.0/24".into(),
+                name: Some("web".into()),
+                environment: Some("prod".into()),
+                owner: None,
+                resource_id: Some("vpc-123".into()),
+            }))
+            .await;
+        assert!(!result.starts_with("Error"), "alloc failed: {result}");
+        let alloc: serde_json::Value = serde_json::from_str(&result).unwrap();
+        let alloc_id = alloc["id"].as_str().unwrap().to_string();
+
+        // Release
+        let result = server
+            .ipam_release(Parameters(IpamReleaseParams {
+                allocation_id: alloc_id,
+            }))
+            .await;
+        assert!(!result.starts_with("Error"));
+        assert!(result.contains("released"));
+    }
+
+    #[tokio::test]
+    async fn test_ipam_utilization_and_free_blocks() {
+        let server = ipam_server().await;
+
+        let result = server
+            .ipam_create_supernet(Parameters(IpamCreateSupernetParams {
+                cidr: "192.168.0.0/24".into(),
+                name: None,
+                description: None,
+            }))
+            .await;
+        let supernet: serde_json::Value = serde_json::from_str(&result).unwrap();
+        let sn_id = supernet["id"].as_str().unwrap().to_string();
+
+        // Allocate half
+        server
+            .ipam_allocate_specific(Parameters(IpamAllocateSpecificParams {
+                supernet_id: sn_id.clone(),
+                cidr: "192.168.0.0/25".into(),
+                name: None,
+                environment: None,
+                owner: None,
+                resource_id: None,
+            }))
+            .await;
+
+        // Utilization
+        let result = server
+            .ipam_utilization(Parameters(IpamUtilizationParams {
+                supernet_id: sn_id.clone(),
+            }))
+            .await;
+        assert!(!result.starts_with("Error"));
+        assert!(result.contains("utilization_percent"));
+
+        // Free blocks
+        let result = server
+            .ipam_free_blocks(Parameters(IpamFreeBlocksParams {
+                supernet_id: sn_id,
+                prefix: None,
+            }))
+            .await;
+        assert!(!result.starts_with("Error"));
+        assert!(result.contains("192.168.0.128/25"));
+    }
+
+    #[tokio::test]
+    async fn test_ipam_find_ip() {
+        let server = ipam_server().await;
+
+        let result = server
+            .ipam_create_supernet(Parameters(IpamCreateSupernetParams {
+                cidr: "10.0.0.0/8".into(),
+                name: None,
+                description: None,
+            }))
+            .await;
+        let supernet: serde_json::Value = serde_json::from_str(&result).unwrap();
+        let sn_id = supernet["id"].as_str().unwrap().to_string();
+
+        server
+            .ipam_allocate_specific(Parameters(IpamAllocateSpecificParams {
+                supernet_id: sn_id,
+                cidr: "10.0.1.0/24".into(),
+                name: None,
+                environment: None,
+                owner: None,
+                resource_id: None,
+            }))
+            .await;
+
+        let result = server
+            .ipam_find_ip(Parameters(IpamFindIpParams {
+                address: "10.0.1.50".into(),
+            }))
+            .await;
+        assert!(!result.starts_with("Error"));
+        assert!(result.contains("10.0.1.0/24"));
+    }
+
+    #[tokio::test]
+    async fn test_ipam_find_resource() {
+        let server = ipam_server().await;
+
+        let result = server
+            .ipam_create_supernet(Parameters(IpamCreateSupernetParams {
+                cidr: "10.0.0.0/8".into(),
+                name: None,
+                description: None,
+            }))
+            .await;
+        let supernet: serde_json::Value = serde_json::from_str(&result).unwrap();
+        let sn_id = supernet["id"].as_str().unwrap().to_string();
+
+        server
+            .ipam_allocate_specific(Parameters(IpamAllocateSpecificParams {
+                supernet_id: sn_id,
+                cidr: "10.0.2.0/24".into(),
+                name: None,
+                environment: None,
+                owner: None,
+                resource_id: Some("eni-abc123".into()),
+            }))
+            .await;
+
+        let result = server
+            .ipam_find_resource(Parameters(IpamFindResourceParams {
+                resource_id: "eni-abc123".into(),
+            }))
+            .await;
+        assert!(!result.starts_with("Error"));
+        assert!(result.contains("10.0.2.0/24"));
+    }
+
+    #[tokio::test]
+    async fn test_ipam_overlap_rejected() {
+        let server = ipam_server().await;
+
+        let result = server
+            .ipam_create_supernet(Parameters(IpamCreateSupernetParams {
+                cidr: "10.0.0.0/8".into(),
+                name: None,
+                description: None,
+            }))
+            .await;
+        let supernet: serde_json::Value = serde_json::from_str(&result).unwrap();
+        let sn_id = supernet["id"].as_str().unwrap().to_string();
+
+        server
+            .ipam_allocate_specific(Parameters(IpamAllocateSpecificParams {
+                supernet_id: sn_id.clone(),
+                cidr: "10.0.0.0/16".into(),
+                name: None,
+                environment: None,
+                owner: None,
+                resource_id: None,
+            }))
+            .await;
+
+        // Overlapping allocation should fail
+        let result = server
+            .ipam_allocate_specific(Parameters(IpamAllocateSpecificParams {
+                supernet_id: sn_id,
+                cidr: "10.0.0.0/24".into(),
+                name: None,
+                environment: None,
+                owner: None,
+                resource_id: None,
+            }))
             .await;
         assert!(result.starts_with("Error"));
     }

@@ -217,7 +217,7 @@ cargo build --release --features mcp
 make build-mcp
 ```
 
-**Available tools:**
+**Calculator tools** (always available):
 
 | Tool | Description |
 |------|-------------|
@@ -226,6 +226,21 @@ make build-mcp
 | `contains_check` | Check if an IP address is within a CIDR range |
 | `from_range` | Convert an IP address range to minimal CIDR blocks |
 | `summarize` | Aggregate CIDRs into the minimal covering set |
+
+**IPAM tools** (enabled with `--ipam-db`):
+
+| Tool | Description |
+|------|-------------|
+| `ipam_create_supernet` | Create a new supernet (top-level address space) |
+| `ipam_list_supernets` | List all supernets |
+| `ipam_allocate` | Auto-allocate next-available CIDR block(s) |
+| `ipam_allocate_specific` | Allocate a specific CIDR block |
+| `ipam_release` | Release an allocation |
+| `ipam_list_allocations` | List allocations (filterable by status/env/owner) |
+| `ipam_free_blocks` | Find free blocks in a supernet |
+| `ipam_utilization` | Get utilization statistics |
+| `ipam_find_ip` | Find allocations containing an IP |
+| `ipam_find_resource` | Find allocations by resource ID |
 
 #### Claude Code
 
@@ -237,6 +252,19 @@ Add to `~/.claude.json`:
     "ipcalc": {
       "command": "/absolute/path/to/ipcalc",
       "args": ["mcp-serve"]
+    }
+  }
+}
+```
+
+With IPAM enabled:
+
+```json
+{
+  "mcpServers": {
+    "ipcalc": {
+      "command": "/absolute/path/to/ipcalc",
+      "args": ["mcp-serve", "--ipam-db", "/path/to/ipam.db"]
     }
   }
 }
@@ -586,7 +614,7 @@ ipcalc serve --ipam-enabled --ipam-db /path/to/ipam.db
 | `/ipam/find-resource/{resource_id}` | `GET` | Find allocations by resource ID |
 | `/ipam/audit` | `GET` | Query audit log (filterable) |
 
-**Status:** CLI and REST API integration complete. MCP tool integration is planned for the next release.
+**Status:** Fully integrated — available via CLI (`ipcalc ipam`), REST API (`ipcalc serve --ipam-enabled`), and MCP server (`ipcalc mcp-serve --ipam-db <path>`).
 
 ## License
 
