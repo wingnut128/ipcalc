@@ -1,4 +1,5 @@
 use crate::error::{IpCalcError, Result};
+use crate::validation;
 use serde::Serialize;
 use std::net::Ipv6Addr;
 use std::str::FromStr;
@@ -31,16 +32,10 @@ pub fn ipv6_mask(prefix: u8) -> u128 {
     }
 }
 
-const MAX_INPUT_LENGTH: usize = 256;
-
 impl Ipv6Subnet {
     pub fn from_cidr(cidr: &str) -> Result<Self> {
-        if cidr.len() > MAX_INPUT_LENGTH {
-            return Err(IpCalcError::InputTooLong {
-                length: cidr.len(),
-                limit: MAX_INPUT_LENGTH,
-            });
-        }
+        validation::validate_cidr(cidr)?;
+
         let (addr_str, prefix_str) = cidr
             .split_once('/')
             .ok_or_else(|| IpCalcError::InvalidCidr(cidr.to_string()))?;

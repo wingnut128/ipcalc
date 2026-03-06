@@ -84,6 +84,9 @@ pub enum IpCalcError {
 
     #[error("No free space in {supernet} for a /{prefix} allocation")]
     NoFreeSpace { supernet: String, prefix: u8 },
+
+    #[error("Invalid input: {0}")]
+    InvalidInput(String),
 }
 
 pub type Result<T> = std::result::Result<T, IpCalcError>;

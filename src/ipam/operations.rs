@@ -6,6 +6,7 @@ use chrono::Utc;
 use crate::error::{IpCalcError, Result};
 use crate::ipam::models::*;
 use crate::ipam::store::IpamStore;
+use crate::validation;
 
 /// High-level IPAM operations that sit above the store trait.
 /// All conflict detection and free-space logic lives here, keeping
@@ -28,7 +29,10 @@ impl IpamOps {
     // -----------------------------------------------------------------------
 
     pub async fn create_supernet(&self, input: &CreateSupernet) -> Result<Supernet> {
-        // Validate CIDR
+        validation::validate_cidr(&input.cidr)?;
+        validation::validate_optional_text(&input.name, 0)?;
+        validation::validate_optional_text(&input.description, 0)?;
+
         let candidate = parse_range(&input.cidr)?;
 
         // Check for overlap with existing supernets
@@ -55,6 +59,7 @@ impl IpamOps {
     }
 
     pub async fn get_supernet(&self, id: &str) -> Result<Supernet> {
+        validation::validate_identifier(id)?;
         self.store.get_supernet(id).await
     }
 
@@ -63,6 +68,7 @@ impl IpamOps {
     }
 
     pub async fn delete_supernet(&self, id: &str) -> Result<()> {
+        validation::validate_identifier(id)?;
         let sn = self.store.get_supernet(id).await?;
         self.store.delete_supernet(id).await?;
         self.audit("delete_supernet", "supernet", id, Some(&sn.cidr))
@@ -76,6 +82,8 @@ impl IpamOps {
 
     /// Allocate a specific CIDR block within a supernet.
     pub async fn allocate_specific(&self, input: &CreateAllocation) -> Result<Allocation> {
+        Self::validate_create_allocation(input)?;
+
         let supernet = self.store.get_supernet(&input.supernet_id).await?;
         let supernet_range = parse_range(&supernet.cidr)?;
         let candidate_range = parse_range(&input.cidr)?;
@@ -112,6 +120,14 @@ impl IpamOps {
 
     /// Auto-allocate the next available block(s) of a given prefix length.
     pub async fn allocate_auto(&self, request: &AutoAllocateRequest) -> Result<Vec<Allocation>> {
+        validation::validate_identifier(&request.supernet_id)?;
+        validation::validate_optional_text(&request.name, 0)?;
+        validation::validate_optional_text(&request.description, 0)?;
+        validation::validate_optional_text(&request.owner, 0)?;
+        validation::validate_optional_text(&request.environment, 0)?;
+        validation::validate_optional_identifier(&request.resource_id)?;
+        validation::validate_optional_identifier(&request.parent_allocation_id)?;
+
         let supernet = self.store.get_supernet(&request.supernet_id).await?;
         let supernet_range = parse_range(&supernet.cidr)?;
         let count = request.count.unwrap_or(1);
@@ -167,10 +183,13 @@ impl IpamOps {
     }
 
     pub async fn get_allocation(&self, id: &str) -> Result<Allocation> {
+        validation::validate_identifier(id)?;
         self.store.get_allocation(id).await
     }
 
     pub async fn list_allocations(&self, filter: &AllocationFilter) -> Result<Vec<Allocation>> {
+        validation::validate_optional_identifier(&filter.supernet_id)?;
+        validation::validate_optional_identifier(&filter.resource_id)?;
         self.store.list_allocations(filter).await
     }
 
@@ -179,12 +198,20 @@ impl IpamOps {
         id: &str,
         input: &UpdateAllocation,
     ) -> Result<Allocation> {
+        validation::validate_identifier(id)?;
+        validation::validate_optional_text(&input.name, 0)?;
+        validation::validate_optional_text(&input.description, 0)?;
+        validation::validate_optional_text(&input.owner, 0)?;
+        validation::validate_optional_text(&input.environment, 0)?;
+        validation::validate_optional_identifier(&input.resource_id)?;
+
         let alloc = self.store.update_allocation(id, input).await?;
         self.audit("update", "allocation", id, None).await?;
         Ok(alloc)
     }
 
     pub async fn release_allocation(&self, id: &str) -> Result<Allocation> {
+        validation::validate_identifier(id)?;
         let alloc = self.store.release_allocation(id).await?;
         self.audit("release", "allocation", id, Some(&alloc.cidr))
             .await?;
@@ -197,6 +224,7 @@ impl IpamOps {
 
     /// Calculate utilization for a supernet.
     pub async fn utilization(&self, supernet_id: &str) -> Result<UtilizationReport> {
+        validation::validate_identifier(supernet_id)?;
         let supernet = self.store.get_supernet(supernet_id).await?;
         let active = self
             .store
@@ -232,6 +260,7 @@ impl IpamOps {
         supernet_id: &str,
         target_prefix: Option<u8>,
     ) -> Result<FreeBlocksReport> {
+        validation::validate_identifier(supernet_id)?;
         let supernet = self.store.get_supernet(supernet_id).await?;
         let supernet_range = parse_range(&supernet.cidr)?;
 
@@ -300,6 +329,7 @@ impl IpamOps {
 
     /// Find allocations containing a given IP address.
     pub async fn find_by_ip(&self, address: &str) -> Result<Vec<Allocation>> {
+        validation::validate_ip_address(address)?;
         let ip = parse_ip(address)?;
 
         // Search all supernets
@@ -332,6 +362,7 @@ impl IpamOps {
 
     /// Find allocations by resource ID.
     pub async fn find_by_resource(&self, resource_id: &str) -> Result<Vec<Allocation>> {
+        validation::validate_identifier(resource_id)?;
         self.store
             .list_allocations(&AllocationFilter {
                 resource_id: Some(resource_id.to_string()),
@@ -350,11 +381,33 @@ impl IpamOps {
     // -----------------------------------------------------------------------
 
     pub async fn set_tags(&self, allocation_id: &str, tags: &[Tag]) -> Result<()> {
+        validation::validate_identifier(allocation_id)?;
+        for tag in tags {
+            validation::validate_text_field(&tag.key, 0)?;
+            validation::validate_text_field(&tag.value, 0)?;
+        }
         self.store.set_tags(allocation_id, tags).await
     }
 
     pub async fn get_tags(&self, allocation_id: &str) -> Result<Vec<Tag>> {
+        validation::validate_identifier(allocation_id)?;
         self.store.get_tags(allocation_id).await
+    }
+
+    // -----------------------------------------------------------------------
+    // Validation helpers
+    // -----------------------------------------------------------------------
+
+    fn validate_create_allocation(input: &CreateAllocation) -> Result<()> {
+        validation::validate_identifier(&input.supernet_id)?;
+        validation::validate_cidr(&input.cidr)?;
+        validation::validate_optional_text(&input.name, 0)?;
+        validation::validate_optional_text(&input.description, 0)?;
+        validation::validate_optional_text(&input.owner, 0)?;
+        validation::validate_optional_text(&input.environment, 0)?;
+        validation::validate_optional_identifier(&input.resource_id)?;
+        validation::validate_optional_identifier(&input.parent_allocation_id)?;
+        Ok(())
     }
 
     // -----------------------------------------------------------------------

@@ -25,6 +25,7 @@ pub mod ipam;
 pub mod config;
 pub mod error;
 pub mod logging;
+pub mod validation;
 
 #[cfg(feature = "tui")]
 pub mod tui;
