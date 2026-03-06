@@ -42,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `GET /ipam/find-ip/{address}` — reverse lookup by IP
   - `GET /ipam/find-resource/{resource_id}` — reverse lookup by resource
   - `GET /ipam/audit` — query audit log
+- OpenAPI/Swagger documentation for all IPAM REST endpoints (requires `--enable-swagger`)
   - `ipam tags get/set` — manage key-value tags on allocations
   - `--db <path>` flag for database location override
   - All output formats supported (JSON, text, CSV, YAML)

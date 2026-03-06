@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "swagger", derive(utoipa::ToSchema))]
 pub struct Supernet {
     pub id: String,
     pub cidr: String,
@@ -20,13 +21,18 @@ pub struct Supernet {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(feature = "swagger", derive(utoipa::ToSchema))]
 pub struct CreateSupernet {
+    /// CIDR notation (e.g., 10.0.0.0/8 or 2001:db8::/32)
     pub cidr: String,
+    /// Optional name for the supernet
     pub name: Option<String>,
+    /// Optional description
     pub description: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "swagger", derive(utoipa::ToSchema))]
 pub struct SupernetList {
     pub supernets: Vec<Supernet>,
     pub count: usize,
@@ -37,6 +43,7 @@ pub struct SupernetList {
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "swagger", derive(utoipa::ToSchema))]
 #[serde(rename_all = "lowercase")]
 pub enum AllocationStatus {
     Active,
@@ -67,6 +74,7 @@ impl std::str::FromStr for AllocationStatus {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "swagger", derive(utoipa::ToSchema))]
 pub struct Allocation {
     pub id: String,
     pub supernet_id: String,
@@ -121,13 +129,21 @@ pub struct AutoAllocateRequest {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(feature = "swagger", derive(utoipa::ToSchema))]
 pub struct UpdateAllocation {
+    /// Updated name
     pub name: Option<String>,
+    /// Updated description
     pub description: Option<String>,
+    /// Updated resource ID
     pub resource_id: Option<String>,
+    /// Updated resource type
     pub resource_type: Option<String>,
+    /// Updated environment
     pub environment: Option<String>,
+    /// Updated owner
     pub owner: Option<String>,
+    /// Updated status
     pub status: Option<AllocationStatus>,
 }
 
@@ -142,6 +158,7 @@ pub struct AllocationFilter {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "swagger", derive(utoipa::ToSchema))]
 pub struct AllocationList {
     pub allocations: Vec<Allocation>,
     pub count: usize,
@@ -152,6 +169,7 @@ pub struct AllocationList {
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "swagger", derive(utoipa::ToSchema))]
 pub struct Tag {
     pub key: String,
     pub value: String,
@@ -162,6 +180,7 @@ pub struct Tag {
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "swagger", derive(utoipa::ToSchema))]
 pub struct AuditEntry {
     pub id: String,
     pub entity_type: String,
@@ -180,6 +199,7 @@ pub struct AuditFilter {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "swagger", derive(utoipa::ToSchema))]
 pub struct AuditList {
     pub entries: Vec<AuditEntry>,
     pub count: usize,
@@ -190,6 +210,7 @@ pub struct AuditList {
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "swagger", derive(utoipa::ToSchema))]
 pub struct UtilizationReport {
     pub supernet_id: String,
     pub supernet_cidr: String,
@@ -201,12 +222,14 @@ pub struct UtilizationReport {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "swagger", derive(utoipa::ToSchema))]
 pub struct FreeBlock {
     pub cidr: String,
     pub size: u128,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "swagger", derive(utoipa::ToSchema))]
 pub struct FreeBlocksReport {
     pub supernet_id: String,
     pub supernet_cidr: String,
