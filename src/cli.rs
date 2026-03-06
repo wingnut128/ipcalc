@@ -89,7 +89,11 @@ pub enum Commands {
 
     /// Start the MCP (Model Context Protocol) server over stdio
     #[cfg(feature = "mcp")]
-    McpServe,
+    McpServe {
+        /// Path to IPAM SQLite database (enables IPAM tools)
+        #[arg(long)]
+        ipam_db: Option<String>,
+    },
 
     /// Start the HTTP API server
     Serve {

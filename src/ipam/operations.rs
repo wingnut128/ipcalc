@@ -15,6 +15,12 @@ pub struct IpamOps {
     store: Arc<dyn IpamStore>,
 }
 
+impl std::fmt::Debug for IpamOps {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("IpamOps").finish_non_exhaustive()
+    }
+}
+
 impl IpamOps {
     pub fn new(store: Arc<dyn IpamStore>) -> Self {
         Self { store }

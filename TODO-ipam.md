@@ -42,42 +42,44 @@ Branch: `feat/ipam-persistence-layer`
 - [x] DB path flag: `--db <path>` on `ipam` subcommand
 - [x] 8 integration tests: supernet lifecycle, allocation workflow, utilization, find-ip, audit, tags, overlap rejection, CSV output (PR #49)
 
-## Phase 3: API Integration
+## Phase 3: API Integration — DONE
 
-- [ ] Add `/ipam/` route group to `api.rs`
-- [ ] Inject `Arc<dyn IpamStore>` into Axum state
-- [ ] `POST /ipam/supernets` — create supernet
-- [ ] `GET /ipam/supernets` — list supernets
-- [ ] `GET /ipam/supernets/:id` — get supernet detail
-- [ ] `DELETE /ipam/supernets/:id` — delete supernet
-- [ ] `POST /ipam/supernets/:id/allocate` — auto-allocate block(s)
-- [ ] `POST /ipam/supernets/:id/allocate-specific` — allocate specific CIDR
-- [ ] `GET /ipam/supernets/:id/allocations` — list allocations in supernet
-- [ ] `GET /ipam/supernets/:id/free` — free blocks
-- [ ] `GET /ipam/supernets/:id/utilization` — utilization stats
-- [ ] `GET /ipam/allocations/:id` — get allocation detail
-- [ ] `PATCH /ipam/allocations/:id` — update allocation metadata
-- [ ] `POST /ipam/allocations/:id/release` — release allocation
-- [ ] `GET /ipam/find-ip/:address` — find allocation by IP
-- [ ] `GET /ipam/find-resource/:resource_id` — find by resource
-- [ ] `GET /ipam/audit` — query audit log
-- [ ] Swagger/OpenAPI schema for all IPAM endpoints
-- [ ] `--ipam-enabled`, `--ipam-backend`, `--ipam-db` flags on `serve`
-- [ ] API integration tests (tower oneshot pattern)
+- [x] Add `/ipam/` route group to `api.rs` (conditionally mounted via `--ipam-enabled`)
+- [x] Inject `Arc<IpamOps>` into Axum state via `Extension`
+- [x] `POST /ipam/supernets` — create supernet
+- [x] `GET /ipam/supernets` — list supernets
+- [x] `GET /ipam/supernets/{id}` — get supernet detail
+- [x] `DELETE /ipam/supernets/{id}` — delete supernet
+- [x] `POST /ipam/supernets/{id}/allocate` — auto-allocate block(s)
+- [x] `POST /ipam/supernets/{id}/allocate-specific` — allocate specific CIDR
+- [x] `GET /ipam/supernets/{id}/allocations` — list allocations in supernet
+- [x] `GET /ipam/supernets/{id}/free` — free blocks
+- [x] `GET /ipam/supernets/{id}/utilization` — utilization stats
+- [x] `GET /ipam/allocations/{id}` — get allocation detail
+- [x] `PATCH /ipam/allocations/{id}` — update allocation metadata
+- [x] `POST /ipam/allocations/{id}/release` — release allocation
+- [x] `PUT /ipam/allocations/{id}/tags` — set tags
+- [x] `GET /ipam/find-ip/{address}` — find allocation by IP
+- [x] `GET /ipam/find-resource/{resource_id}` — find by resource
+- [x] `GET /ipam/audit` — query audit log
+- [x] Swagger/OpenAPI schema for all IPAM endpoints (PR #52)
+- [x] `--ipam-enabled`, `--ipam-backend`, `--ipam-db` flags on `serve`
+- [x] 16 API integration tests (tower oneshot pattern, PR #51)
 
-## Phase 4: MCP IPAM Tools
+## Phase 4: MCP IPAM Tools — DONE
 
-- [ ] `ipam_create_supernet` tool
-- [ ] `ipam_list_supernets` tool
-- [ ] `ipam_allocate` tool
-- [ ] `ipam_allocate_specific` tool
-- [ ] `ipam_release` tool
-- [ ] `ipam_list_allocations` tool
-- [ ] `ipam_free_blocks` tool
-- [ ] `ipam_utilization` tool
-- [ ] `ipam_find_ip` tool
-- [ ] `ipam_find_resource` tool
-- [ ] MCP integration tests for IPAM tools
+- [x] `ipam_create_supernet` tool
+- [x] `ipam_list_supernets` tool
+- [x] `ipam_allocate` tool (auto-allocate)
+- [x] `ipam_allocate_specific` tool
+- [x] `ipam_release` tool
+- [x] `ipam_list_allocations` tool (with status/env/owner filters)
+- [x] `ipam_free_blocks` tool (with prefix filter)
+- [x] `ipam_utilization` tool
+- [x] `ipam_find_ip` tool
+- [x] `ipam_find_resource` tool
+- [x] `--ipam-db` flag on `mcp-serve` command
+- [x] 8 IPAM MCP integration tests + 1 disabled-state test
 
 ## Phase 5: Free Space & Utilization Enhancements
 

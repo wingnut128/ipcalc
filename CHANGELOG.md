@@ -49,7 +49,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rust-native MCP (Model Context Protocol) server replacing the Node.js implementation
   - Uses `rmcp` (official Rust SDK) with `#[tool]` macros for zero-overhead tool definitions
   - Calls library functions directly instead of shelling out to the binary
-  - 5 tools: `subnet_calc`, `subnet_split`, `contains_check`, `from_range`, `summarize`
+  - 5 calculator tools: `subnet_calc`, `subnet_split`, `contains_check`, `from_range`, `summarize`
+  - 10 IPAM tools: `ipam_create_supernet`, `ipam_list_supernets`, `ipam_allocate`, `ipam_allocate_specific`, `ipam_release`, `ipam_list_allocations`, `ipam_free_blocks`, `ipam_utilization`, `ipam_find_ip`, `ipam_find_resource`
+  - IPAM tools enabled via `ipcalc mcp-serve --ipam-db <path>`
   - Runs via `ipcalc mcp-serve` subcommand over stdio transport
   - Enabled with `--features mcp` cargo feature flag
   - 15 unit tests covering all tools and error paths
