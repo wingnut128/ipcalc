@@ -30,6 +30,9 @@ pub mod validation;
 #[cfg(feature = "tui")]
 pub mod tui;
 
+#[cfg(feature = "mcp")]
+pub mod mcp;
+
 // Public API re-exports
 pub use batch::{BatchResult, process_batch, process_batch_with_limit};
 pub use contains::ContainsResult;

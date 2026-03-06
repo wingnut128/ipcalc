@@ -31,6 +31,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `ipam tags get/set` — manage key-value tags on allocations
   - `--db <path>` flag for database location override
   - All output formats supported (JSON, text, CSV, YAML)
+- Rust-native MCP (Model Context Protocol) server replacing the Node.js implementation
+  - Uses `rmcp` (official Rust SDK) with `#[tool]` macros for zero-overhead tool definitions
+  - Calls library functions directly instead of shelling out to the binary
+  - 5 tools: `subnet_calc`, `subnet_split`, `contains_check`, `from_range`, `summarize`
+  - Runs via `ipcalc mcp-serve` subcommand over stdio transport
+  - Enabled with `--features mcp` cargo feature flag
+  - 15 unit tests covering all tools and error paths
 - Shared input validation module (`src/validation.rs`) for CIDR, IP, text field, and identifier scrubbing
   - Centralized length checks, control character rejection, and path traversal detection
   - Replaces inline `MAX_INPUT_LENGTH` in `ipv4.rs` and `ipv6.rs`

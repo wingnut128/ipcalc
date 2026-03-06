@@ -207,13 +207,13 @@ The TUI automatically detects IPv4/IPv6 and provides color-coded input fields wi
 
 ### MCP Server (AI Assistant Integration)
 
-The MCP server lets AI assistants like Claude use ipcalc as a tool for subnet calculations. It communicates over stdio using the [Model Context Protocol](https://modelcontextprotocol.io).
-
-**Prerequisites:** Node.js 18+ and the `ipcalc` release binary.
+The MCP server lets AI assistants like Claude use ipcalc as a tool for subnet calculations. It communicates over stdio using the [Model Context Protocol](https://modelcontextprotocol.io). Built natively in Rust using the official `rmcp` SDK — no Node.js required.
 
 ```bash
-# Build the ipcalc binary and MCP server
-make release
+# Build with MCP support
+cargo build --release --features mcp
+
+# Or use make
 make build-mcp
 ```
 
@@ -235,8 +235,8 @@ Add to `~/.claude.json`:
 {
   "mcpServers": {
     "ipcalc": {
-      "command": "node",
-      "args": ["/absolute/path/to/ipcalc/mcp-server/dist/index.js"]
+      "command": "/absolute/path/to/ipcalc",
+      "args": ["mcp-serve"]
     }
   }
 }
@@ -250,26 +250,8 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
 {
   "mcpServers": {
     "ipcalc": {
-      "command": "node",
-      "args": ["/absolute/path/to/ipcalc/mcp-server/dist/index.js"]
-    }
-  }
-}
-```
-
-#### Custom binary path
-
-By default the MCP server looks for the `ipcalc` binary at `../../target/release/ipcalc` relative to the script. Override this with the `IPCALC_BIN` environment variable:
-
-```json
-{
-  "mcpServers": {
-    "ipcalc": {
-      "command": "node",
-      "args": ["/absolute/path/to/ipcalc/mcp-server/dist/index.js"],
-      "env": {
-        "IPCALC_BIN": "/usr/local/bin/ipcalc"
-      }
+      "command": "/absolute/path/to/ipcalc",
+      "args": ["mcp-serve"]
     }
   }
 }
@@ -474,10 +456,10 @@ make lint
 # Build release binary
 make release
 
-# Build MCP server
+# Build with MCP feature
 make build-mcp
 
-# Run MCP server tests
+# Run MCP tests
 make test-mcp
 
 # Run semgrep security scanning
