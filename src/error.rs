@@ -66,6 +66,27 @@ pub enum IpCalcError {
 
     #[error("Configuration parse error: {0}")]
     ConfigParse(String),
+
+    #[error("Database error: {0}")]
+    DatabaseError(String),
+
+    #[error("Allocation conflict: {candidate} overlaps with existing {existing}")]
+    AllocationConflict { existing: String, candidate: String },
+
+    #[error("Supernet not found: {0}")]
+    SupernetNotFound(String),
+
+    #[error("Allocation not found: {0}")]
+    AllocationNotFound(String),
+
+    #[error("Supernet {0} has active allocations and cannot be deleted")]
+    SupernetHasActiveAllocations(String),
+
+    #[error("No free space in {supernet} for a /{prefix} allocation")]
+    NoFreeSpace { supernet: String, prefix: u8 },
+
+    #[error("Invalid input: {0}")]
+    InvalidInput(String),
 }
 
 pub type Result<T> = std::result::Result<T, IpCalcError>;

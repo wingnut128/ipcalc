@@ -21,6 +21,7 @@ A fast IPv4 and IPv6 subnet calculator written in Rust. Available as a CLI tool,
 - **HTTP API**: REST endpoints for all calculations
 - **OpenAPI documentation**: Machine-readable API specification for easy integration with tools like Swagger Editor, Postman, and Insomnia
 - **MCP server**: [Model Context Protocol](https://modelcontextprotocol.io) server for AI assistant integration (Claude, etc.) over stdio
+- **IPAM (IP Address Management)**: allocation tracking with conflict detection, audit trail, and utilization reporting (library-level; CLI/API integration coming soon)
 - **Configurable security**: rate limiting, request size limits, timeouts, restrictive CORS, and security headers
 - **TOML configuration**: server settings via config file with CLI flag overrides
 
@@ -518,6 +519,27 @@ make fuzz FUZZ_TARGET=fuzz_contains FUZZ_DURATION=30
 | `fuzz_contains` | `check_ipv4_contains`, `check_ipv6_contains` |
 | `fuzz_from_range` | `from_range_ipv4`, `from_range_ipv6` |
 | `fuzz_subnet_ops` | `count_subnets`, `generate_ipv4_subnets`, `generate_ipv6_subnets` |
+
+## IPAM (IP Address Management)
+
+The IPAM module provides library-level IP address allocation tracking with a pluggable storage backend.
+
+**Current capabilities:**
+
+- **Supernet management** — define top-level address spaces (e.g. `10.0.0.0/8`) with overlap detection
+- **Allocation lifecycle** — allocate specific CIDRs or auto-allocate next-available blocks, update metadata, release
+- **Conflict detection** — prevents overlapping allocations within a supernet
+- **Free space discovery** — find available blocks by prefix length, with utilization reporting
+- **Reverse lookup** — find allocations by IP address or resource ID
+- **Audit trail** — immutable log of all mutations (create, update, release)
+- **Tags** — flexible key-value metadata on allocations
+
+**Storage backend:**
+
+- **SQLite** (default) — zero-config, WAL mode, r2d2 connection pooling, embedded schema migrations
+- **Pluggable design** — the `IpamStore` async trait allows additional backends (Postgres, MySQL) in future releases
+
+**Status:** Library-only. CLI commands, API endpoints, and MCP tool integration are planned for the next release.
 
 ## License
 

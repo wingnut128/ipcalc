@@ -18,10 +18,14 @@ pub mod api;
 pub mod cli;
 pub mod output;
 
+// IPAM persistence layer
+pub mod ipam;
+
 // Infrastructure
 pub mod config;
 pub mod error;
 pub mod logging;
+pub mod validation;
 
 #[cfg(feature = "tui")]
 pub mod tui;

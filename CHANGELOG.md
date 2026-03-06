@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- IPAM persistence layer with SQLite backend for tracking IP address allocations
+  - `IpamStore` async trait defining a pluggable storage backend interface
+  - `SqliteStore` implementation with r2d2 connection pooling and WAL mode
+  - Supernet management (create, list, get, delete with active-allocation guard)
+  - Allocation lifecycle (create, auto-allocate, update, release with conflict detection)
+  - Free space discovery and utilization reporting
+  - IP address and resource ID reverse lookup
+  - Immutable audit log for all mutations
+  - Flexible key-value tags on allocations
+  - DB path resolution: CLI flag > env var > config file > XDG default
+  - Embedded schema migrations with version tracking
+- Shared input validation module (`src/validation.rs`) for CIDR, IP, text field, and identifier scrubbing
+  - Centralized length checks, control character rejection, and path traversal detection
+  - Replaces inline `MAX_INPUT_LENGTH` in `ipv4.rs` and `ipv6.rs`
+  - Wired into all IPAM `IpamOps` public methods
+
 ## [0.12.0] - 2026-03-02
 
 ### Removed
