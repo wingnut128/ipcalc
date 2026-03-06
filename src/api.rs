@@ -326,16 +326,34 @@ pub fn create_router(config: RouterConfig) -> Router {
         .route("/v6/from-range", get(from_range_ipv6_handler))
         .route("/batch", post(batch_handler));
 
-    // Conditionally mount IPAM routes and dashboard
+    // Dashboard is always available (serves the SPA for all tools)
+    let ipam_enabled = config.ipam_ops.is_some();
+    let router = router
+        .route("/dashboard", get(dashboard))
+        .route("/", get(dashboard));
+
+    // Conditionally mount IPAM routes
     let router = if let Some(ops) = config.ipam_ops {
         let ipam_router = crate::ipam_api::create_ipam_router().layer(Extension(ops));
-        router
-            .nest("/ipam", ipam_router)
-            .route("/dashboard", get(ipam_dashboard))
-            .route("/", get(ipam_dashboard))
+        router.nest("/ipam", ipam_router)
     } else {
         router
     };
+
+    // Features endpoint
+    #[cfg(feature = "swagger")]
+    let swagger_enabled = config.server.enable_swagger;
+    #[cfg(not(feature = "swagger"))]
+    let swagger_enabled = false;
+
+    let features = FeaturesResponse {
+        ipam: ipam_enabled,
+        swagger: swagger_enabled,
+    };
+    let router = router.route(
+        "/features",
+        get(move || async move { Json(features.clone()) }),
+    );
 
     #[cfg(feature = "swagger")]
     let router = if config.server.enable_swagger {
@@ -907,7 +925,13 @@ async fn batch_handler(
     }
 }
 
-async fn ipam_dashboard() -> impl IntoResponse {
+#[derive(Clone, Serialize)]
+struct FeaturesResponse {
+    ipam: bool,
+    swagger: bool,
+}
+
+async fn dashboard() -> impl IntoResponse {
     (
         StatusCode::OK,
         [(header::CONTENT_TYPE, "text/html")],
