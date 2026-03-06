@@ -424,6 +424,7 @@ Commands:
   from-range  Convert an IP range (start–end) into minimal CIDR blocks
   contains    Check if an IP address is contained in a subnet
   summarize   Summarize/aggregate CIDRs into the minimal covering set
+  ipam        IP Address Management — track allocations, supernets, and free space
   serve       Start the HTTP API server
   help        Print help for a command
 
@@ -539,7 +540,40 @@ The IPAM module provides library-level IP address allocation tracking with a plu
 - **SQLite** (default) — zero-config, WAL mode, r2d2 connection pooling, embedded schema migrations
 - **Pluggable design** — the `IpamStore` async trait allows additional backends (Postgres, MySQL) in future releases
 
-**Status:** Library-only. CLI commands, API endpoints, and MCP tool integration are planned for the next release.
+**CLI usage:**
+
+```bash
+# Create a supernet
+ipcalc ipam supernet create 10.0.0.0/8 --name "Corporate Network"
+
+# List supernets
+ipcalc ipam supernet list --format text
+
+# Allocate a specific block
+ipcalc ipam allocate <supernet-id> 10.0.1.0/24 --name "Web Tier" --environment production
+
+# Auto-allocate next available /24s
+ipcalc ipam auto-allocate <supernet-id> -p 24 -n 3 --name "App Tier"
+
+# Check utilization
+ipcalc ipam utilization <supernet-id> --format text
+
+# Find free blocks
+ipcalc ipam free-blocks <supernet-id> -p 24
+
+# Look up which allocation contains an IP
+ipcalc ipam find-ip 10.0.1.50
+
+# View audit log
+ipcalc ipam audit --limit 10
+
+# Use a specific database file
+ipcalc ipam --db /path/to/my.db supernet list
+```
+
+**Database location** (precedence order): `--db` flag > `IPCALC_DB` env var > `db_path` in config file > `~/.local/share/ipcalc/ipcalc.db`
+
+**Status:** CLI integration complete. API endpoints and MCP tool integration are planned for the next release.
 
 ## License
 

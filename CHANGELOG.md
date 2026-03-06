@@ -20,6 +20,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Flexible key-value tags on allocations
   - DB path resolution: CLI flag > env var > config file > XDG default
   - Embedded schema migrations with version tracking
+- IPAM CLI integration via `ipcalc ipam` subcommand with full command suite:
+  - `ipam supernet create/list/get/delete` — manage top-level address spaces
+  - `ipam allocate` / `ipam auto-allocate` — specific or next-available allocation
+  - `ipam allocation get/list/update` — query and update allocations
+  - `ipam release` — mark allocations as released
+  - `ipam utilization` / `ipam free-blocks` — capacity reporting
+  - `ipam find-ip` / `ipam find-resource` — reverse lookup
+  - `ipam audit` — query the immutable audit log
+  - `ipam tags get/set` — manage key-value tags on allocations
+  - `--db <path>` flag for database location override
+  - All output formats supported (JSON, text, CSV, YAML)
 - Shared input validation module (`src/validation.rs`) for CIDR, IP, text field, and identifier scrubbing
   - Centralized length checks, control character rejection, and path traversal detection
   - Replaces inline `MAX_INPUT_LENGTH` in `ipv4.rs` and `ipv6.rs`

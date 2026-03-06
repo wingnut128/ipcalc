@@ -77,6 +77,16 @@ pub enum Commands {
         cidrs: Vec<String>,
     },
 
+    /// IP Address Management — track allocations, supernets, and free space
+    Ipam {
+        /// Path to SQLite database (overrides IPCALC_DB env and config file)
+        #[arg(long)]
+        db: Option<String>,
+
+        #[command(subcommand)]
+        command: IpamCommands,
+    },
+
     /// Start the HTTP API server
     Serve {
         /// Address to bind to
@@ -134,6 +144,244 @@ pub enum Commands {
         /// Request timeout in seconds (overrides config file)
         #[arg(long)]
         timeout: Option<u64>,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum IpamCommands {
+    /// Manage supernets (top-level address spaces)
+    Supernet {
+        #[command(subcommand)]
+        command: SupernetCommands,
+    },
+
+    /// Allocate a specific CIDR block within a supernet
+    Allocate {
+        /// Supernet ID
+        supernet_id: String,
+        /// CIDR to allocate (e.g., 10.0.1.0/24)
+        cidr: String,
+        /// Allocation name
+        #[arg(long)]
+        name: Option<String>,
+        /// Description
+        #[arg(long)]
+        description: Option<String>,
+        /// Resource ID (e.g., vpc-12345)
+        #[arg(long)]
+        resource_id: Option<String>,
+        /// Resource type (e.g., vpc, subnet)
+        #[arg(long)]
+        resource_type: Option<String>,
+        /// Environment (e.g., production, staging)
+        #[arg(long)]
+        environment: Option<String>,
+        /// Owner
+        #[arg(long)]
+        owner: Option<String>,
+        /// Initial status
+        #[arg(long)]
+        status: Option<String>,
+        /// Parent allocation ID for sub-allocations
+        #[arg(long)]
+        parent_id: Option<String>,
+    },
+
+    /// Auto-allocate the next available block(s) of a given prefix length
+    AutoAllocate {
+        /// Supernet ID
+        supernet_id: String,
+        /// Desired prefix length (e.g., 24 for /24)
+        #[arg(short = 'p', long)]
+        prefix: u8,
+        /// Number of blocks to allocate
+        #[arg(short = 'n', long, default_value = "1")]
+        count: u32,
+        /// Allocation name
+        #[arg(long)]
+        name: Option<String>,
+        /// Description
+        #[arg(long)]
+        description: Option<String>,
+        /// Resource ID
+        #[arg(long)]
+        resource_id: Option<String>,
+        /// Resource type
+        #[arg(long)]
+        resource_type: Option<String>,
+        /// Environment
+        #[arg(long)]
+        environment: Option<String>,
+        /// Owner
+        #[arg(long)]
+        owner: Option<String>,
+        /// Initial status
+        #[arg(long)]
+        status: Option<String>,
+        /// Parent allocation ID
+        #[arg(long)]
+        parent_id: Option<String>,
+    },
+
+    /// Manage allocations (get, list, update)
+    Allocation {
+        #[command(subcommand)]
+        command: AllocationCommands,
+    },
+
+    /// Release an allocation (mark as released)
+    Release {
+        /// Allocation ID to release
+        id: String,
+    },
+
+    /// Show utilization report for a supernet
+    Utilization {
+        /// Supernet ID
+        supernet_id: String,
+    },
+
+    /// List free blocks in a supernet
+    FreeBlocks {
+        /// Supernet ID
+        supernet_id: String,
+        /// Filter by target prefix length
+        #[arg(short = 'p', long)]
+        prefix: Option<u8>,
+    },
+
+    /// Find allocations containing an IP address
+    FindIp {
+        /// IP address to look up
+        address: String,
+    },
+
+    /// Find allocations by resource ID
+    FindResource {
+        /// Resource ID to search for
+        resource_id: String,
+    },
+
+    /// Query the audit log
+    Audit {
+        /// Filter by entity type (supernet, allocation)
+        #[arg(long)]
+        entity_type: Option<String>,
+        /// Filter by entity ID
+        #[arg(long)]
+        entity_id: Option<String>,
+        /// Filter by action
+        #[arg(long)]
+        action: Option<String>,
+        /// Maximum entries to return
+        #[arg(long, default_value = "50")]
+        limit: u32,
+    },
+
+    /// Manage tags on allocations
+    Tags {
+        #[command(subcommand)]
+        command: TagCommands,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum SupernetCommands {
+    /// Create a new supernet
+    Create {
+        /// CIDR notation (e.g., 10.0.0.0/8)
+        cidr: String,
+        /// Supernet name
+        #[arg(long)]
+        name: Option<String>,
+        /// Description
+        #[arg(long)]
+        description: Option<String>,
+    },
+    /// List all supernets
+    List,
+    /// Get details of a supernet
+    Get {
+        /// Supernet ID
+        id: String,
+    },
+    /// Delete a supernet (must have no active allocations)
+    Delete {
+        /// Supernet ID
+        id: String,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum AllocationCommands {
+    /// Get details of an allocation
+    Get {
+        /// Allocation ID
+        id: String,
+    },
+    /// List allocations with optional filters
+    List {
+        /// Filter by supernet ID
+        #[arg(long)]
+        supernet_id: Option<String>,
+        /// Filter by status (active, reserved, released)
+        #[arg(long)]
+        status: Option<String>,
+        /// Filter by resource ID
+        #[arg(long)]
+        resource_id: Option<String>,
+        /// Filter by resource type
+        #[arg(long)]
+        resource_type: Option<String>,
+        /// Filter by environment
+        #[arg(long)]
+        environment: Option<String>,
+        /// Filter by owner
+        #[arg(long)]
+        owner: Option<String>,
+    },
+    /// Update an allocation's metadata
+    Update {
+        /// Allocation ID
+        id: String,
+        /// New name
+        #[arg(long)]
+        name: Option<String>,
+        /// New description
+        #[arg(long)]
+        description: Option<String>,
+        /// New resource ID
+        #[arg(long)]
+        resource_id: Option<String>,
+        /// New resource type
+        #[arg(long)]
+        resource_type: Option<String>,
+        /// New environment
+        #[arg(long)]
+        environment: Option<String>,
+        /// New owner
+        #[arg(long)]
+        owner: Option<String>,
+        /// New status
+        #[arg(long)]
+        status: Option<String>,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum TagCommands {
+    /// Get tags for an allocation
+    Get {
+        /// Allocation ID
+        allocation_id: String,
+    },
+    /// Set tags on an allocation (replaces existing tags)
+    Set {
+        /// Allocation ID
+        allocation_id: String,
+        /// Tags in key=value format
+        #[arg(required = true, num_args = 1..)]
+        tags: Vec<String>,
     },
 }
 
