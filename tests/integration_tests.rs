@@ -621,3 +621,262 @@ fn test_contains_yaml_output() {
     assert!(stdout.contains("contained:"));
     assert!(stdout.contains("true"));
 }
+
+// ── IPAM CLI Integration ────────────────────────────────────────────
+
+/// Helper to run IPAM commands against a temporary database.
+fn run_ipam(db: &str, args: &[&str]) -> (String, String, bool) {
+    let mut full_args = vec!["ipam", "--db", db];
+    full_args.extend_from_slice(args);
+    run_ipcalc(&full_args)
+}
+
+#[test]
+fn test_ipam_supernet_lifecycle() {
+    let db = "/tmp/ipcalc-test-lifecycle.db";
+    let _ = std::fs::remove_file(db);
+
+    // Create supernet
+    let (stdout, _, success) =
+        run_ipam(db, &["supernet", "create", "10.0.0.0/16", "--name", "Test"]);
+    assert!(success);
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("Invalid JSON");
+    assert_eq!(json["cidr"], "10.0.0.0/16");
+    assert_eq!(json["name"], "Test");
+    let sn_id = json["id"].as_str().unwrap().to_string();
+
+    // List supernets
+    let (stdout, _, success) = run_ipam(db, &["supernet", "list"]);
+    assert!(success);
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("Invalid JSON");
+    assert_eq!(json["count"], 1);
+
+    // Get supernet
+    let (stdout, _, success) = run_ipam(db, &["supernet", "get", &sn_id]);
+    assert!(success);
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("Invalid JSON");
+    assert_eq!(json["cidr"], "10.0.0.0/16");
+
+    // Delete supernet
+    let (_, stderr, success) = run_ipam(db, &["supernet", "delete", &sn_id]);
+    assert!(success);
+    assert!(stderr.contains("deleted"));
+
+    let _ = std::fs::remove_file(db);
+}
+
+#[test]
+fn test_ipam_allocation_workflow() {
+    let db = "/tmp/ipcalc-test-alloc.db";
+    let _ = std::fs::remove_file(db);
+
+    // Create supernet
+    let (stdout, _, _) = run_ipam(db, &["supernet", "create", "10.0.0.0/16"]);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    let sn_id = json["id"].as_str().unwrap().to_string();
+
+    // Allocate specific
+    let (stdout, _, success) = run_ipam(
+        db,
+        &[
+            "allocate",
+            &sn_id,
+            "10.0.1.0/24",
+            "--name",
+            "Web",
+            "--environment",
+            "prod",
+        ],
+    );
+    assert!(success);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(json["cidr"], "10.0.1.0/24");
+    assert_eq!(json["status"], "active");
+    let alloc_id = json["id"].as_str().unwrap().to_string();
+
+    // Auto-allocate
+    let (stdout, _, success) = run_ipam(db, &["auto-allocate", &sn_id, "-p", "24", "-n", "2"]);
+    assert!(success);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(json["count"], 2);
+
+    // Update allocation
+    let (stdout, _, success) = run_ipam(
+        db,
+        &[
+            "allocation",
+            "update",
+            &alloc_id,
+            "--owner",
+            "team-infra",
+            "--resource-id",
+            "vpc-123",
+        ],
+    );
+    assert!(success);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(json["owner"], "team-infra");
+    assert_eq!(json["resource_id"], "vpc-123");
+
+    // Release
+    let (stdout, _, success) = run_ipam(db, &["release", &alloc_id]);
+    assert!(success);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(json["status"], "released");
+
+    let _ = std::fs::remove_file(db);
+}
+
+#[test]
+fn test_ipam_utilization_and_free_blocks() {
+    let db = "/tmp/ipcalc-test-util.db";
+    let _ = std::fs::remove_file(db);
+
+    let (stdout, _, _) = run_ipam(db, &["supernet", "create", "10.0.0.0/24"]);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    let sn_id = json["id"].as_str().unwrap().to_string();
+
+    run_ipam(db, &["allocate", &sn_id, "10.0.0.0/25"]);
+
+    // Utilization — text format
+    let (stdout, _, success) = run_ipam(db, &["utilization", &sn_id, "--format", "text"]);
+    assert!(success);
+    assert!(stdout.contains("50.00%"));
+
+    // Free blocks
+    let (stdout, _, success) = run_ipam(db, &["free-blocks", &sn_id]);
+    assert!(success);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(json["blocks"][0]["cidr"], "10.0.0.128/25");
+
+    let _ = std::fs::remove_file(db);
+}
+
+#[test]
+fn test_ipam_find_ip() {
+    let db = "/tmp/ipcalc-test-findip.db";
+    let _ = std::fs::remove_file(db);
+
+    let (stdout, _, _) = run_ipam(db, &["supernet", "create", "10.0.0.0/8"]);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    let sn_id = json["id"].as_str().unwrap().to_string();
+
+    run_ipam(db, &["allocate", &sn_id, "10.0.1.0/24", "--name", "Web"]);
+
+    let (stdout, _, success) = run_ipam(db, &["find-ip", "10.0.1.50"]);
+    assert!(success);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(json["count"], 1);
+    assert_eq!(json["allocations"][0]["cidr"], "10.0.1.0/24");
+
+    // IP not in any allocation
+    let (stdout, _, success) = run_ipam(db, &["find-ip", "10.0.2.50"]);
+    assert!(success);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(json["count"], 0);
+
+    let _ = std::fs::remove_file(db);
+}
+
+#[test]
+fn test_ipam_audit_log() {
+    let db = "/tmp/ipcalc-test-audit.db";
+    let _ = std::fs::remove_file(db);
+
+    let (stdout, _, _) = run_ipam(db, &["supernet", "create", "10.0.0.0/8"]);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    let sn_id = json["id"].as_str().unwrap().to_string();
+
+    run_ipam(db, &["allocate", &sn_id, "10.0.0.0/24"]);
+
+    let (stdout, _, success) = run_ipam(db, &["audit", "--limit", "10"]);
+    assert!(success);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert!(json["count"].as_u64().unwrap() >= 2); // at least create_supernet + allocate
+
+    let _ = std::fs::remove_file(db);
+}
+
+#[test]
+fn test_ipam_tags() {
+    let db = "/tmp/ipcalc-test-tags.db";
+    let _ = std::fs::remove_file(db);
+
+    let (stdout, _, _) = run_ipam(db, &["supernet", "create", "10.0.0.0/8"]);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    let sn_id = json["id"].as_str().unwrap().to_string();
+
+    let (stdout, _, _) = run_ipam(db, &["allocate", &sn_id, "10.0.0.0/24"]);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    let alloc_id = json["id"].as_str().unwrap().to_string();
+
+    // Set tags
+    let (stdout, _, success) = run_ipam(
+        db,
+        &["tags", "set", &alloc_id, "team=infra", "cost-center=12345"],
+    );
+    assert!(success);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(json["tags"].as_array().unwrap().len(), 2);
+
+    // Get tags
+    let (stdout, _, success) = run_ipam(db, &["tags", "get", &alloc_id]);
+    assert!(success);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(json["tags"].as_array().unwrap().len(), 2);
+
+    let _ = std::fs::remove_file(db);
+}
+
+#[test]
+fn test_ipam_overlap_rejected() {
+    let db = "/tmp/ipcalc-test-overlap.db";
+    let _ = std::fs::remove_file(db);
+
+    let (stdout, _, _) = run_ipam(db, &["supernet", "create", "10.0.0.0/16"]);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    let sn_id = json["id"].as_str().unwrap().to_string();
+
+    run_ipam(db, &["allocate", &sn_id, "10.0.0.0/24"]);
+
+    // Overlapping allocation should fail
+    let (_, stderr, success) = run_ipam(db, &["allocate", &sn_id, "10.0.0.128/25"]);
+    assert!(!success);
+    assert!(
+        stderr.contains("overlap") || stderr.contains("conflict") || stderr.contains("Conflict")
+    );
+
+    let _ = std::fs::remove_file(db);
+}
+
+#[test]
+fn test_ipam_csv_output() {
+    let db = "/tmp/ipcalc-test-csv.db";
+    let _ = std::fs::remove_file(db);
+
+    let (stdout, _, _) = run_ipam(db, &["supernet", "create", "10.0.0.0/16"]);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    let sn_id = json["id"].as_str().unwrap().to_string();
+
+    run_ipam(db, &["allocate", &sn_id, "10.0.0.0/24"]);
+    run_ipam(db, &["allocate", &sn_id, "10.0.1.0/24"]);
+
+    let (stdout, _, success) = run_ipam(
+        db,
+        &[
+            "allocation",
+            "list",
+            "--supernet-id",
+            &sn_id,
+            "--format",
+            "csv",
+        ],
+    );
+    assert!(success);
+    let lines: Vec<&str> = stdout.lines().filter(|l| !l.is_empty()).collect();
+    // header + 2 data rows
+    assert_eq!(lines.len(), 3);
+    assert!(lines[0].contains("cidr"));
+
+    let _ = std::fs::remove_file(db);
+}

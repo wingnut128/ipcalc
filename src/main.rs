@@ -16,6 +16,8 @@ use std::io::{self, BufRead, Write};
 use std::net::SocketAddr;
 use tracing::{info, warn};
 
+mod ipam_cli;
+
 /// Print to stdout, handling broken pipe errors gracefully.
 /// When output is piped to commands like `head`, the pipe may close early.
 fn print_stdout(s: &str) {
@@ -182,6 +184,14 @@ async fn main() {
                 handle_result(&writer, summarize_ipv6(&cidrs), &cli.output);
             } else {
                 handle_result(&writer, summarize_ipv4(&cidrs), &cli.output);
+            }
+        }
+        Some(Commands::Ipam { db, command }) => {
+            if let Err(e) =
+                ipam_cli::handle_ipam_command(&writer, &cli.output, db.as_deref(), command).await
+            {
+                eprintln!("Error: {}", e);
+                std::process::exit(1);
             }
         }
         Some(Commands::Serve {
