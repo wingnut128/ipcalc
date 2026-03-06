@@ -326,10 +326,13 @@ pub fn create_router(config: RouterConfig) -> Router {
         .route("/v6/from-range", get(from_range_ipv6_handler))
         .route("/batch", post(batch_handler));
 
-    // Conditionally mount IPAM routes
+    // Conditionally mount IPAM routes and dashboard
     let router = if let Some(ops) = config.ipam_ops {
         let ipam_router = crate::ipam_api::create_ipam_router().layer(Extension(ops));
-        router.nest("/ipam", ipam_router)
+        router
+            .nest("/ipam", ipam_router)
+            .route("/dashboard", get(ipam_dashboard))
+            .route("/", get(ipam_dashboard))
     } else {
         router
     };
@@ -902,4 +905,12 @@ async fn batch_handler(
             )
         }
     }
+}
+
+async fn ipam_dashboard() -> impl IntoResponse {
+    (
+        StatusCode::OK,
+        [(header::CONTENT_TYPE, "text/html")],
+        include_str!("../dashboard.html"),
+    )
 }
