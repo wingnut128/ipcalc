@@ -194,6 +194,13 @@ async fn main() {
                 std::process::exit(1);
             }
         }
+        #[cfg(feature = "mcp")]
+        Some(Commands::McpServe) => {
+            if let Err(e) = ipcalc::mcp::run_mcp_server().await {
+                eprintln!("MCP server error: {}", e);
+                std::process::exit(1);
+            }
+        }
         Some(Commands::Serve {
             address,
             port,

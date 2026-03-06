@@ -142,6 +142,7 @@ This is a Rust CLI/API/MCP server for IPv4 and IPv6 subnet calculations with IPA
 - `api.rs` - Axum HTTP server with REST endpoints sharing the same data structures as CLI
 - `ipam/` - IPAM persistence layer: `operations.rs` (business logic), `store.rs` (trait), `sqlite/` (backend), `models.rs`, `config.rs`
 - `ipam_cli.rs` - CLI handler for `ipcalc ipam` subcommands
+- `mcp.rs` - Rust-native MCP server using `rmcp` SDK (feature-gated: `mcp`)
 - `error.rs` - Custom `IpCalcError` enum with `Result<T>` type alias used throughout
 - `output.rs` - `TextOutput` / `CsvOutput` traits for JSON/text/CSV/YAML formatting
 
@@ -151,5 +152,5 @@ This is a Rust CLI/API/MCP server for IPv4 and IPv6 subnet calculations with IPA
 
 - Error handling: `thiserror` derive macros, all functions return `Result<T>`
 - Logging: `tracing` with `#[instrument]` on API handlers
-- CLI: clap derive with subcommands (`split`, `contains`, `from-range`, `summarize`, `ipam`, `serve`)
+- CLI: clap derive with subcommands (`split`, `contains`, `from-range`, `summarize`, `ipam`, `serve`, `mcp-serve`)
 - Tests: Unit tests in modules, integration tests in `tests/` call binary via subprocess

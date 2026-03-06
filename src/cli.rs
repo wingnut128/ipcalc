@@ -87,6 +87,10 @@ pub enum Commands {
         command: IpamCommands,
     },
 
+    /// Start the MCP (Model Context Protocol) server over stdio
+    #[cfg(feature = "mcp")]
+    McpServe,
+
     /// Start the HTTP API server
     Serve {
         /// Address to bind to

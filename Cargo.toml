@@ -29,6 +29,8 @@ uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 async-trait = "0.1"
 dirs = "6"
+rmcp = { version = "1.1", features = ["server", "transport-io", "macros"], optional = true }
+schemars = { version = "1", optional = true }
 ratatui = { version = "0.30", optional = true }
 crossterm = { version = "0.27", optional = true }
 ipnet = { version = "2", optional = true }
@@ -47,6 +49,7 @@ http-body-util = "0.1"
 default = ["swagger"]
 swagger = ["dep:utoipa", "dep:utoipa-swagger-ui"]
 tui = ["dep:ratatui", "dep:crossterm", "dep:ipnet"]
+mcp = ["dep:rmcp", "dep:schemars"]
 
 [profile.release]
 lto = true

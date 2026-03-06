@@ -2,7 +2,7 @@
 .PHONY: build-tui release-tui build-no-default release-no-default build-all-features release-all-features
 .PHONY: fuzz semgrep
 .PHONY: install install-tui install-all-features uninstall
-.PHONY: build-mcp test-mcp clean-mcp
+.PHONY: build-mcp test-mcp
 
 # Variables
 BINARY_NAME := ipcalc
@@ -112,17 +112,13 @@ FUZZ_DURATION ?= 60
 fuzz:
 	cargo +nightly fuzz run $(FUZZ_TARGET) -- -max_total_time=$(FUZZ_DURATION)
 
-# Build MCP server (TypeScript)
+# Build with MCP feature
 build-mcp:
-	cd mcp-server && npm install && npm run build
+	cargo build --features mcp
 
-# Run MCP server tests (requires release binary)
-test-mcp: release build-mcp
-	cd mcp-server && npm test
-
-# Clean MCP server build artifacts
-clean-mcp:
-	rm -rf mcp-server/dist mcp-server/node_modules
+# Run MCP server tests
+test-mcp:
+	cargo test --features mcp mcp::
 
 # Run semgrep security scanning
 semgrep:
@@ -159,7 +155,7 @@ help:
 	@echo "  release-no-default     Build release binary without default features"
 	@echo "  build-all-features     Build debug binary with all features"
 	@echo "  release-all-features   Build release binary with all features"
-	@echo "  build-mcp              Build MCP server (TypeScript)"
+	@echo "  build-mcp              Build with MCP feature"
 	@echo ""
 	@echo "Test Targets:"
 	@echo "  test                   Run all tests"
