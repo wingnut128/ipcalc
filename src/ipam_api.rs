@@ -8,6 +8,8 @@ use axum::{
     routing::{get, post, put},
 };
 use serde::Deserialize;
+#[cfg(feature = "swagger")]
+use utoipa::{IntoParams, ToSchema};
 
 use crate::error::IpCalcError;
 use crate::ipam::models::*;
@@ -54,62 +56,111 @@ fn ipam_error_response(err: IpCalcError) -> Response {
 }
 
 // ---------------------------------------------------------------------------
+// Error response schema (for OpenAPI)
+// ---------------------------------------------------------------------------
+
+#[derive(serde::Serialize)]
+#[cfg_attr(feature = "swagger", derive(ToSchema))]
+pub struct IpamErrorResponse {
+    /// Error message
+    error: String,
+}
+
+// ---------------------------------------------------------------------------
 // Request/query types
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "swagger", derive(ToSchema))]
 pub struct AllocateSpecificRequest {
+    /// CIDR to allocate (e.g., 10.0.1.0/24)
     pub cidr: String,
+    /// Allocation status (active, reserved)
     pub status: Option<AllocationStatus>,
+    /// External resource identifier
     pub resource_id: Option<String>,
+    /// Resource type (e.g., vpc, subnet, host)
     pub resource_type: Option<String>,
+    /// Human-readable name
     pub name: Option<String>,
+    /// Description
     pub description: Option<String>,
+    /// Environment (e.g., production, staging)
     pub environment: Option<String>,
+    /// Owner
     pub owner: Option<String>,
+    /// Parent allocation ID for hierarchical allocations
     pub parent_allocation_id: Option<String>,
+    /// Key-value tags
     pub tags: Option<Vec<Tag>>,
 }
 
 #[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "swagger", derive(ToSchema))]
 pub struct AutoAllocateBody {
+    /// Desired prefix length for the allocation
     pub prefix_length: u8,
+    /// Number of blocks to allocate (default: 1)
     pub count: Option<u32>,
+    /// Allocation status (active, reserved)
     pub status: Option<AllocationStatus>,
+    /// External resource identifier
     pub resource_id: Option<String>,
+    /// Resource type
     pub resource_type: Option<String>,
+    /// Human-readable name
     pub name: Option<String>,
+    /// Description
     pub description: Option<String>,
+    /// Environment
     pub environment: Option<String>,
+    /// Owner
     pub owner: Option<String>,
+    /// Parent allocation ID
     pub parent_allocation_id: Option<String>,
+    /// Key-value tags
     pub tags: Option<Vec<Tag>>,
 }
 
 #[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "swagger", derive(IntoParams))]
 pub struct AllocationFilterQuery {
+    /// Filter by status (active, reserved, released)
     pub status: Option<String>,
+    /// Filter by resource ID
     pub resource_id: Option<String>,
+    /// Filter by resource type
     pub resource_type: Option<String>,
+    /// Filter by environment
     pub environment: Option<String>,
+    /// Filter by owner
     pub owner: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "swagger", derive(IntoParams))]
 pub struct FreeBlocksQuery {
+    /// Filter free blocks by minimum prefix length
     pub prefix: Option<u8>,
 }
 
 #[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "swagger", derive(IntoParams))]
 pub struct AuditQuery {
+    /// Filter by entity type (supernet, allocation)
     pub entity_type: Option<String>,
+    /// Filter by entity ID
     pub entity_id: Option<String>,
+    /// Filter by action (e.g., create_supernet, allocate)
     pub action: Option<String>,
+    /// Maximum number of entries to return
     pub limit: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "swagger", derive(ToSchema))]
 pub struct TagsBody {
+    /// Tags to set on the allocation
     pub tags: Vec<Tag>,
 }
 
@@ -153,6 +204,17 @@ pub fn create_ipam_router() -> Router {
 // Handlers
 // ---------------------------------------------------------------------------
 
+#[cfg_attr(feature = "swagger", utoipa::path(
+    post,
+    path = "/ipam/supernets",
+    request_body = CreateSupernet,
+    responses(
+        (status = 201, description = "Supernet created", body = Supernet),
+        (status = 400, description = "Invalid CIDR", body = IpamErrorResponse),
+        (status = 409, description = "Overlapping supernet", body = IpamErrorResponse),
+    ),
+    tag = "ipam"
+))]
 async fn ipam_create_supernet(
     Extension(ops): Extension<Arc<IpamOps>>,
     Json(body): Json<CreateSupernet>,
@@ -163,6 +225,14 @@ async fn ipam_create_supernet(
     }
 }
 
+#[cfg_attr(feature = "swagger", utoipa::path(
+    get,
+    path = "/ipam/supernets",
+    responses(
+        (status = 200, description = "List of supernets", body = SupernetList),
+    ),
+    tag = "ipam"
+))]
 async fn ipam_list_supernets(Extension(ops): Extension<Arc<IpamOps>>) -> impl IntoResponse {
     match ops.list_supernets().await {
         Ok(supernets) => {
@@ -176,6 +246,18 @@ async fn ipam_list_supernets(Extension(ops): Extension<Arc<IpamOps>>) -> impl In
     }
 }
 
+#[cfg_attr(feature = "swagger", utoipa::path(
+    get,
+    path = "/ipam/supernets/{id}",
+    params(
+        ("id" = String, Path, description = "Supernet ID")
+    ),
+    responses(
+        (status = 200, description = "Supernet details", body = Supernet),
+        (status = 404, description = "Supernet not found", body = IpamErrorResponse),
+    ),
+    tag = "ipam"
+))]
 async fn ipam_get_supernet(
     Extension(ops): Extension<Arc<IpamOps>>,
     Path(id): Path<String>,
@@ -186,6 +268,19 @@ async fn ipam_get_supernet(
     }
 }
 
+#[cfg_attr(feature = "swagger", utoipa::path(
+    delete,
+    path = "/ipam/supernets/{id}",
+    params(
+        ("id" = String, Path, description = "Supernet ID")
+    ),
+    responses(
+        (status = 204, description = "Supernet deleted"),
+        (status = 404, description = "Supernet not found", body = IpamErrorResponse),
+        (status = 409, description = "Supernet has active allocations", body = IpamErrorResponse),
+    ),
+    tag = "ipam"
+))]
 async fn ipam_delete_supernet(
     Extension(ops): Extension<Arc<IpamOps>>,
     Path(id): Path<String>,
@@ -196,6 +291,21 @@ async fn ipam_delete_supernet(
     }
 }
 
+#[cfg_attr(feature = "swagger", utoipa::path(
+    post,
+    path = "/ipam/supernets/{id}/allocate-specific",
+    params(
+        ("id" = String, Path, description = "Supernet ID")
+    ),
+    request_body = AllocateSpecificRequest,
+    responses(
+        (status = 201, description = "Allocation created", body = Allocation),
+        (status = 400, description = "Invalid CIDR", body = IpamErrorResponse),
+        (status = 404, description = "Supernet not found", body = IpamErrorResponse),
+        (status = 409, description = "Overlapping allocation", body = IpamErrorResponse),
+    ),
+    tag = "ipam"
+))]
 async fn ipam_allocate_specific(
     Extension(ops): Extension<Arc<IpamOps>>,
     Path(supernet_id): Path<String>,
@@ -220,6 +330,20 @@ async fn ipam_allocate_specific(
     }
 }
 
+#[cfg_attr(feature = "swagger", utoipa::path(
+    post,
+    path = "/ipam/supernets/{id}/allocate",
+    params(
+        ("id" = String, Path, description = "Supernet ID")
+    ),
+    request_body = AutoAllocateBody,
+    responses(
+        (status = 201, description = "Allocations created", body = AllocationList),
+        (status = 404, description = "Supernet not found", body = IpamErrorResponse),
+        (status = 422, description = "No free space available", body = IpamErrorResponse),
+    ),
+    tag = "ipam"
+))]
 async fn ipam_auto_allocate(
     Extension(ops): Extension<Arc<IpamOps>>,
     Path(supernet_id): Path<String>,
@@ -251,6 +375,19 @@ async fn ipam_auto_allocate(
     }
 }
 
+#[cfg_attr(feature = "swagger", utoipa::path(
+    get,
+    path = "/ipam/supernets/{id}/allocations",
+    params(
+        ("id" = String, Path, description = "Supernet ID"),
+        AllocationFilterQuery,
+    ),
+    responses(
+        (status = 200, description = "List of allocations", body = AllocationList),
+        (status = 404, description = "Supernet not found", body = IpamErrorResponse),
+    ),
+    tag = "ipam"
+))]
 async fn ipam_list_supernet_allocations(
     Extension(ops): Extension<Arc<IpamOps>>,
     Path(supernet_id): Path<String>,
@@ -277,6 +414,19 @@ async fn ipam_list_supernet_allocations(
     }
 }
 
+#[cfg_attr(feature = "swagger", utoipa::path(
+    get,
+    path = "/ipam/supernets/{id}/free",
+    params(
+        ("id" = String, Path, description = "Supernet ID"),
+        FreeBlocksQuery,
+    ),
+    responses(
+        (status = 200, description = "Free blocks report", body = FreeBlocksReport),
+        (status = 404, description = "Supernet not found", body = IpamErrorResponse),
+    ),
+    tag = "ipam"
+))]
 async fn ipam_free_blocks(
     Extension(ops): Extension<Arc<IpamOps>>,
     Path(supernet_id): Path<String>,
@@ -288,6 +438,18 @@ async fn ipam_free_blocks(
     }
 }
 
+#[cfg_attr(feature = "swagger", utoipa::path(
+    get,
+    path = "/ipam/supernets/{id}/utilization",
+    params(
+        ("id" = String, Path, description = "Supernet ID")
+    ),
+    responses(
+        (status = 200, description = "Utilization report", body = UtilizationReport),
+        (status = 404, description = "Supernet not found", body = IpamErrorResponse),
+    ),
+    tag = "ipam"
+))]
 async fn ipam_utilization(
     Extension(ops): Extension<Arc<IpamOps>>,
     Path(supernet_id): Path<String>,
@@ -298,6 +460,18 @@ async fn ipam_utilization(
     }
 }
 
+#[cfg_attr(feature = "swagger", utoipa::path(
+    get,
+    path = "/ipam/allocations/{id}",
+    params(
+        ("id" = String, Path, description = "Allocation ID")
+    ),
+    responses(
+        (status = 200, description = "Allocation details", body = Allocation),
+        (status = 404, description = "Allocation not found", body = IpamErrorResponse),
+    ),
+    tag = "ipam"
+))]
 async fn ipam_get_allocation(
     Extension(ops): Extension<Arc<IpamOps>>,
     Path(id): Path<String>,
@@ -308,6 +482,19 @@ async fn ipam_get_allocation(
     }
 }
 
+#[cfg_attr(feature = "swagger", utoipa::path(
+    patch,
+    path = "/ipam/allocations/{id}",
+    params(
+        ("id" = String, Path, description = "Allocation ID")
+    ),
+    request_body = UpdateAllocation,
+    responses(
+        (status = 200, description = "Allocation updated", body = Allocation),
+        (status = 404, description = "Allocation not found", body = IpamErrorResponse),
+    ),
+    tag = "ipam"
+))]
 async fn ipam_update_allocation(
     Extension(ops): Extension<Arc<IpamOps>>,
     Path(id): Path<String>,
@@ -319,6 +506,18 @@ async fn ipam_update_allocation(
     }
 }
 
+#[cfg_attr(feature = "swagger", utoipa::path(
+    post,
+    path = "/ipam/allocations/{id}/release",
+    params(
+        ("id" = String, Path, description = "Allocation ID")
+    ),
+    responses(
+        (status = 200, description = "Allocation released", body = Allocation),
+        (status = 404, description = "Allocation not found", body = IpamErrorResponse),
+    ),
+    tag = "ipam"
+))]
 async fn ipam_release_allocation(
     Extension(ops): Extension<Arc<IpamOps>>,
     Path(id): Path<String>,
@@ -329,6 +528,17 @@ async fn ipam_release_allocation(
     }
 }
 
+#[cfg_attr(feature = "swagger", utoipa::path(
+    get,
+    path = "/ipam/find-ip/{address}",
+    params(
+        ("address" = String, Path, description = "IP address to look up")
+    ),
+    responses(
+        (status = 200, description = "Matching allocations", body = AllocationList),
+    ),
+    tag = "ipam"
+))]
 async fn ipam_find_ip(
     Extension(ops): Extension<Arc<IpamOps>>,
     Path(address): Path<String>,
@@ -345,6 +555,17 @@ async fn ipam_find_ip(
     }
 }
 
+#[cfg_attr(feature = "swagger", utoipa::path(
+    get,
+    path = "/ipam/find-resource/{resource_id}",
+    params(
+        ("resource_id" = String, Path, description = "Resource ID to look up")
+    ),
+    responses(
+        (status = 200, description = "Matching allocations", body = AllocationList),
+    ),
+    tag = "ipam"
+))]
 async fn ipam_find_resource(
     Extension(ops): Extension<Arc<IpamOps>>,
     Path(resource_id): Path<String>,
@@ -361,6 +582,15 @@ async fn ipam_find_resource(
     }
 }
 
+#[cfg_attr(feature = "swagger", utoipa::path(
+    get,
+    path = "/ipam/audit",
+    params(AuditQuery),
+    responses(
+        (status = 200, description = "Audit log entries", body = AuditList),
+    ),
+    tag = "ipam"
+))]
 async fn ipam_query_audit(
     Extension(ops): Extension<Arc<IpamOps>>,
     Query(query): Query<AuditQuery>,
@@ -383,6 +613,19 @@ async fn ipam_query_audit(
     }
 }
 
+#[cfg_attr(feature = "swagger", utoipa::path(
+    put,
+    path = "/ipam/allocations/{id}/tags",
+    params(
+        ("id" = String, Path, description = "Allocation ID")
+    ),
+    request_body = TagsBody,
+    responses(
+        (status = 200, description = "Tags updated, returns allocation", body = Allocation),
+        (status = 404, description = "Allocation not found", body = IpamErrorResponse),
+    ),
+    tag = "ipam"
+))]
 async fn ipam_set_tags(
     Extension(ops): Extension<Arc<IpamOps>>,
     Path(id): Path<String>,

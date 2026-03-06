@@ -42,6 +42,14 @@ use crate::summarize::{Ipv4SummaryResult, Ipv6SummaryResult};
 use crate::summarize::{summarize_ipv4_with_limit, summarize_ipv6_with_limit};
 
 #[cfg(feature = "swagger")]
+use crate::ipam::models::{
+    Allocation, AllocationList, AllocationStatus, AuditEntry, AuditList, CreateSupernet, FreeBlock,
+    FreeBlocksReport, Supernet, SupernetList, Tag, UpdateAllocation, UtilizationReport,
+};
+#[cfg(feature = "swagger")]
+use crate::ipam_api::{AllocateSpecificRequest, AutoAllocateBody, IpamErrorResponse, TagsBody};
+
+#[cfg(feature = "swagger")]
 #[derive(OpenApi)]
 #[openapi(
     paths(
@@ -58,17 +66,43 @@ use crate::summarize::{summarize_ipv4_with_limit, summarize_ipv6_with_limit};
         from_range_ipv4_handler,
         from_range_ipv6_handler,
         batch_handler,
+        crate::ipam_api::ipam_create_supernet,
+        crate::ipam_api::ipam_list_supernets,
+        crate::ipam_api::ipam_get_supernet,
+        crate::ipam_api::ipam_delete_supernet,
+        crate::ipam_api::ipam_allocate_specific,
+        crate::ipam_api::ipam_auto_allocate,
+        crate::ipam_api::ipam_list_supernet_allocations,
+        crate::ipam_api::ipam_free_blocks,
+        crate::ipam_api::ipam_utilization,
+        crate::ipam_api::ipam_get_allocation,
+        crate::ipam_api::ipam_update_allocation,
+        crate::ipam_api::ipam_release_allocation,
+        crate::ipam_api::ipam_find_ip,
+        crate::ipam_api::ipam_find_resource,
+        crate::ipam_api::ipam_query_audit,
+        crate::ipam_api::ipam_set_tags,
     ),
     components(
-        schemas(Ipv4Subnet, Ipv6Subnet, Ipv4SubnetList, Ipv6SubnetList, SplitSummary, ContainsResult, Ipv4SummaryResult, Ipv6SummaryResult, Ipv4FromRangeResult, Ipv6FromRangeResult, SubnetQuery, SplitQuery, ContainsQuery, SummarizeQuery, FromRangeQuery, BatchRequest, BatchResult, ErrorResponse, VersionResponse)
+        schemas(
+            Ipv4Subnet, Ipv6Subnet, Ipv4SubnetList, Ipv6SubnetList, SplitSummary,
+            ContainsResult, Ipv4SummaryResult, Ipv6SummaryResult, Ipv4FromRangeResult,
+            Ipv6FromRangeResult, SubnetQuery, SplitQuery, ContainsQuery, SummarizeQuery,
+            FromRangeQuery, BatchRequest, BatchResult, ErrorResponse, VersionResponse,
+            Supernet, SupernetList, CreateSupernet, Allocation, AllocationList,
+            AllocationStatus, Tag, UpdateAllocation, AllocateSpecificRequest,
+            AutoAllocateBody, TagsBody, AuditEntry, AuditList, UtilizationReport,
+            FreeBlock, FreeBlocksReport, IpamErrorResponse,
+        )
     ),
     tags(
-        (name = "ipcalc", description = "IP subnet calculator API")
+        (name = "ipcalc", description = "IP subnet calculator API"),
+        (name = "ipam", description = "IP Address Management API"),
     ),
     info(
         title = "ipcalc API",
         version = env!("CARGO_PKG_VERSION"),
-        description = "A fast IPv4 and IPv6 subnet calculator API",
+        description = "A fast IPv4 and IPv6 subnet calculator API with IP address management",
     )
 )]
 pub struct ApiDoc;
