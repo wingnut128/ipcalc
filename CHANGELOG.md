@@ -55,6 +55,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Runs via `ipcalc mcp-serve` subcommand over stdio transport
   - Enabled with `--features mcp` cargo feature flag
   - 15 unit tests covering all tools and error paths
+- Full web application dashboard replacing the IPAM-only dashboard
+  - 7-page SPA using Alpine.js with hash-based routing
+  - Subnet Calculator with bit-grid visualization for IPv4/IPv6
+  - Subnet Splitter, Contains Check, Summarize, From Range tools
+  - IPAM Dashboard with utilization charts (Chart.js), search, tag management
+  - Subnet Visualizer with address space map and split distribution chart
+  - Brutalist Industrial design: monospace everything, high-contrast dark theme, thick borders
+  - Dashboard always served at `/` and `/dashboard` (no longer requires IPAM)
+  - `GET /features` endpoint for frontend feature detection (IPAM, Swagger)
+  - Responsive layout with sidebar collapsing to bottom bar on mobile
 - Shared input validation module (`src/validation.rs`) for CIDR, IP, text field, and identifier scrubbing
   - Centralized length checks, control character rejection, and path traversal detection
   - Replaces inline `MAX_INPUT_LENGTH` in `ipv4.rs` and `ipv6.rs`
