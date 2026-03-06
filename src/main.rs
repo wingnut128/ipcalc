@@ -318,6 +318,7 @@ async fn main() {
                     .expect("Failed to initialize IPAM store");
                 info!("IPAM enabled, backend: {}", server_config.ipam_backend);
                 println!("IPAM endpoints enabled at /ipam/");
+                println!("IPAM dashboard at /dashboard");
                 Some(std::sync::Arc::new(ipam::operations::IpamOps::new(store)))
             } else {
                 None
