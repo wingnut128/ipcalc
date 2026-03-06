@@ -62,6 +62,15 @@ After every commit (whether from a Linear ticket or not):
 - **CHANGELOG.md**: Always add an entry under `[Unreleased]` for any meaningful change (features, fixes, refactors, CI changes, dependency updates). Only skip for typo fixes or whitespace-only changes.
 - **README.md**: Update whenever there are important changes to the codebase — new or changed CLI commands, new build/make targets, new features, deprecation warnings, removed functionality, or changes to setup/install instructions. Do not update README for purely internal refactors or CI-only changes unless they affect the developer workflow (e.g., new `make` targets).
 
+### Task completion checklist
+
+Every task is only "done" when ALL of the following are true:
+
+1. **Tests exist and pass** — new functionality must have unit tests and/or integration tests. Run `make check` (or at minimum `cargo test`) and confirm zero failures before committing.
+2. **Documentation updated** — CHANGELOG.md and README.md updated per the rules above.
+3. **Plan/PRD checkboxes marked** — if the task comes from a plan, PRD, or TODO document with checkboxes, mark completed items as done (`- [x]`) in the same commit or immediately after.
+4. **No regressions** — all pre-existing tests still pass. Do not merge if any test is broken.
+
 ## Release Process
 
 Releases use a `workflow_dispatch` GitHub Actions workflow to respect branch protection on `main`.
@@ -106,6 +115,14 @@ ipcalc 192.168.1.0/24                  # IPv4 subnet info
 ipcalc 2001:db8::/48                   # IPv6 prefix info
 ipcalc split 10.0.0.0/8 -p 16 -n 10   # Generate 10 /16 subnets
 ipcalc split 10.0.0.0/8 -p 16 --max   # Generate all possible /16 subnets
+
+# IPAM commands
+ipcalc ipam supernet create 10.0.0.0/8 --name "Corp"
+ipcalc ipam allocate <supernet-id> 10.0.1.0/24 --name "Web"
+ipcalc ipam auto-allocate <supernet-id> -p 24 -n 3
+ipcalc ipam utilization <supernet-id> --format text
+ipcalc ipam find-ip 10.0.1.50
+ipcalc ipam --db /path/to/db supernet list   # Custom DB path
 ```
 
 Global options: `--format json|text|csv|yaml`, `--output <file>`
@@ -114,22 +131,25 @@ Global options: `--format json|text|csv|yaml`, `--output <file>`
 
 ## Architecture
 
-This is a Rust CLI/API for IPv4 and IPv6 subnet calculations.
+This is a Rust CLI/API/MCP server for IPv4 and IPv6 subnet calculations with IPAM (IP Address Management).
 
-**Core flow**: CLI (`main.rs`) parses args via clap (`cli.rs`) → routes to calculation modules (`ipv4.rs`, `ipv6.rs`, `subnet_generator.rs`) → formats output (`output.rs`).
+**Core flow**: CLI (`main.rs`) parses args via clap (`cli.rs`) → routes to calculation modules (`ipv4.rs`, `ipv6.rs`, `subnet_generator.rs`) or IPAM operations (`ipam_cli.rs` → `ipam/operations.rs`) → formats output (`output.rs`).
 
 **Key modules**:
 - `ipv4.rs` / `ipv6.rs` - Subnet calculation logic using bitwise operations (u32/u128)
 - `subnet_generator.rs` - Splits supernets into smaller subnets (supports `--count` or `--max`)
-- `api.rs` - Axum HTTP server with 6 endpoints sharing the same data structures as CLI
+- `validation.rs` - Shared input validation (CIDR, IP, text fields, identifiers, status allowlist)
+- `api.rs` - Axum HTTP server with REST endpoints sharing the same data structures as CLI
+- `ipam/` - IPAM persistence layer: `operations.rs` (business logic), `store.rs` (trait), `sqlite/` (backend), `models.rs`, `config.rs`
+- `ipam_cli.rs` - CLI handler for `ipcalc ipam` subcommands
 - `error.rs` - Custom `IpCalcError` enum with `Result<T>` type alias used throughout
-- `output.rs` - `TextOutput` trait for JSON/text formatting
+- `output.rs` - `TextOutput` / `CsvOutput` traits for JSON/text/CSV/YAML formatting
 
-**Data structures** (`Ipv4Subnet`, `Ipv6Subnet`) are serializable and shared between CLI and API.
+**Data structures** (`Ipv4Subnet`, `Ipv6Subnet`, IPAM models) are serializable and shared between CLI, API, and MCP server.
 
 ## Code Patterns
 
 - Error handling: `thiserror` derive macros, all functions return `Result<T>`
 - Logging: `tracing` with `#[instrument]` on API handlers
-- CLI: clap derive with subcommands (`v4`, `v6`, `split`, `serve`)
+- CLI: clap derive with subcommands (`split`, `contains`, `from-range`, `summarize`, `ipam`, `serve`)
 - Tests: Unit tests in modules, integration tests in `tests/` call binary via subprocess
