@@ -22,10 +22,12 @@ pub struct ServerConfig {
     pub enable_swagger: bool,
     /// Enable IPAM API routes
     pub ipam_enabled: bool,
-    /// IPAM storage backend (currently only "sqlite")
+    /// IPAM storage backend ("sqlite" or "postgres")
     pub ipam_backend: String,
     /// IPAM database path (SQLite)
     pub ipam_db: Option<String>,
+    /// IPAM database URL (PostgreSQL)
+    pub ipam_db_url: Option<String>,
 }
 
 impl Default for ServerConfig {
@@ -42,6 +44,7 @@ impl Default for ServerConfig {
             ipam_enabled: false,
             ipam_backend: "sqlite".to_string(),
             ipam_db: None,
+            ipam_db_url: None,
         }
     }
 }
@@ -59,6 +62,7 @@ pub struct CliOverrides {
     pub ipam_enabled: bool,
     pub ipam_backend: Option<String>,
     pub ipam_db: Option<String>,
+    pub ipam_db_url: Option<String>,
 }
 
 impl ServerConfig {
@@ -103,6 +107,9 @@ impl ServerConfig {
         }
         if overrides.ipam_db.is_some() {
             self.ipam_db.clone_from(&overrides.ipam_db);
+        }
+        if overrides.ipam_db_url.is_some() {
+            self.ipam_db_url.clone_from(&overrides.ipam_db_url);
         }
     }
 }

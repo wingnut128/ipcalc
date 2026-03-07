@@ -9,6 +9,7 @@ use std::path::Path;
 
 use crate::error::{IpCalcError, Result};
 use crate::ipam::models::*;
+use crate::ipam::parse_cidr_metadata;
 use crate::ipam::store::IpamStore;
 
 type ConnPool = Pool<SqliteConnectionManager>;
@@ -653,65 +654,10 @@ impl IpamStore for SqliteStore {
     }
 }
 
-/// Parse a CIDR string and return (network_address, broadcast_address, prefix_length, total_hosts, ip_version).
-fn parse_cidr_metadata(cidr: &str) -> Result<(String, String, u8, u128, u8)> {
-    let (addr_str, prefix_str) = cidr
-        .split_once('/')
-        .ok_or_else(|| IpCalcError::InvalidCidr(cidr.to_string()))?;
-
-    let prefix: u8 = prefix_str
-        .parse()
-        .map_err(|_| IpCalcError::InvalidCidr(cidr.to_string()))?;
-
-    // Try IPv4 first
-    if let Ok(addr) = addr_str.parse::<std::net::Ipv4Addr>() {
-        if prefix > 32 {
-            return Err(IpCalcError::InvalidPrefixLength(prefix));
-        }
-        let addr_u32 = u32::from(addr);
-        let mask = if prefix == 0 {
-            0u32
-        } else {
-            !0u32 << (32 - prefix)
-        };
-        let network = addr_u32 & mask;
-        let broadcast = network | !mask;
-        let total: u128 = 1u128 << (32 - prefix);
-        Ok((
-            std::net::Ipv4Addr::from(network).to_string(),
-            std::net::Ipv4Addr::from(broadcast).to_string(),
-            prefix,
-            total,
-            4,
-        ))
-    } else if let Ok(addr) = addr_str.parse::<std::net::Ipv6Addr>() {
-        if prefix > 128 {
-            return Err(IpCalcError::InvalidPrefixLength(prefix));
-        }
-        let addr_u128 = u128::from(addr);
-        let mask = if prefix == 0 {
-            0u128
-        } else {
-            !0u128 << (128 - prefix)
-        };
-        let network = addr_u128 & mask;
-        let last = network | !mask;
-        let total: u128 = 1u128 << (128 - prefix);
-        Ok((
-            std::net::Ipv6Addr::from(network).to_string(),
-            std::net::Ipv6Addr::from(last).to_string(),
-            prefix,
-            total,
-            6,
-        ))
-    } else {
-        Err(IpCalcError::InvalidCidr(cidr.to_string()))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ipam::parse_cidr_metadata;
 
     async fn test_store() -> SqliteStore {
         let store = SqliteStore::in_memory().unwrap();

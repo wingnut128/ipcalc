@@ -219,6 +219,7 @@ async fn main() {
             ipam_enabled,
             ipam_backend,
             ipam_db,
+            ipam_db_url,
         }) => {
             // Parse and validate log level
             let level = match parse_log_level(&log_level) {
@@ -268,6 +269,7 @@ async fn main() {
                 ipam_enabled,
                 ipam_backend,
                 ipam_db,
+                ipam_db_url,
             });
 
             // Bind-address warning
@@ -312,10 +314,17 @@ async fn main() {
             // Initialize IPAM if enabled
             let ipam_ops = if server_config.ipam_enabled {
                 use ipcalc::ipam;
-                let ipam_config = ipam::config::IpamConfig::default();
-                let store = ipam::create_store(&ipam_config, server_config.ipam_db.as_deref())
-                    .await
-                    .expect("Failed to initialize IPAM store");
+                let mut ipam_config = ipam::config::IpamConfig::default();
+                if let Ok(backend) = server_config.ipam_backend.parse::<ipam::config::Backend>() {
+                    ipam_config.backend = backend;
+                }
+                let store = ipam::create_store(
+                    &ipam_config,
+                    server_config.ipam_db.as_deref(),
+                    server_config.ipam_db_url.as_deref(),
+                )
+                .await
+                .expect("Failed to initialize IPAM store");
                 info!("IPAM enabled, backend: {}", server_config.ipam_backend);
                 println!("IPAM endpoints enabled at /ipam/");
                 println!("IPAM dashboard at /dashboard");

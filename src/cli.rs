@@ -164,6 +164,10 @@ pub enum Commands {
         /// IPAM database path (overrides IPCALC_DB env and config file)
         #[arg(long)]
         ipam_db: Option<String>,
+
+        /// IPAM PostgreSQL connection URL (overrides IPCALC_IPAM_DB_URL env and config file)
+        #[arg(long)]
+        ipam_db_url: Option<String>,
     },
 }
 
