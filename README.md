@@ -414,6 +414,12 @@ curl http://localhost:8080/api-docs/openapi.json > openapi.json
 - View request/response schemas with examples
 - Execute requests and see live responses
 
+**Building with PostgreSQL IPAM backend:**
+
+```bash
+cargo build --release --features ipam-postgres
+```
+
 **Building without OpenAPI support:**
 
 The OpenAPI documentation feature is optional and enabled by default. To build a smaller binary without it:
@@ -546,10 +552,11 @@ The IPAM module provides library-level IP address allocation tracking with a plu
 - **Audit trail** — immutable log of all mutations (create, update, release)
 - **Tags** — flexible key-value metadata on allocations
 
-**Storage backend:**
+**Storage backends:**
 
 - **SQLite** (default) — zero-config, WAL mode, r2d2 connection pooling, embedded schema migrations
-- **Pluggable design** — the `IpamStore` async trait allows additional backends (Postgres, MySQL) in future releases
+- **PostgreSQL** — opt-in via `--features ipam-postgres`, uses `sqlx` with async connection pooling; configure with `--ipam-backend postgres --ipam-db-url <url>`
+- **Pluggable design** — the `IpamStore` async trait allows additional backends via feature flags
 
 **CLI usage:**
 

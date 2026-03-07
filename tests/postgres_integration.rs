@@ -1,0 +1,407 @@
+#![cfg(feature = "ipam-postgres")]
+
+//! PostgreSQL integration tests.
+//!
+//! These tests start a Docker container running PostgreSQL, exercise the
+//! `PostgresStore` implementation against it, then tear the container down.
+//!
+//! Requirements: Docker must be running locally.
+//! Run with: `cargo test --features ipam-postgres --test postgres_integration`
+
+use std::process::Command;
+use std::sync::Arc;
+use std::time::Duration;
+
+use ipcalc::ipam::config::PostgresConfig;
+use ipcalc::ipam::models::*;
+use ipcalc::ipam::operations::IpamOps;
+use ipcalc::ipam::postgres::PostgresStore;
+use ipcalc::ipam::store::IpamStore;
+
+const CONTAINER_NAME: &str = "ipcalc-test-pg";
+const PG_PORT: u16 = 15432;
+const PG_DB: &str = "ipcalc_test";
+const PG_USER: &str = "postgres";
+
+fn pg_url() -> String {
+    format!("postgresql://{PG_USER}@127.0.0.1:{PG_PORT}/{PG_DB}")
+}
+
+fn start_container() {
+    // Remove any leftover container from a previous run
+    let _ = Command::new("docker")
+        .args(["rm", "-f", CONTAINER_NAME])
+        .output();
+
+    let status = Command::new("docker")
+        .args([
+            "run",
+            "-d",
+            "--name",
+            CONTAINER_NAME,
+            "-e",
+            "POSTGRES_HOST_AUTH_METHOD=trust",
+            "-e",
+            &format!("POSTGRES_DB={PG_DB}"),
+            "-e",
+            &format!("POSTGRES_USER={PG_USER}"),
+            "-p",
+            &format!("{PG_PORT}:5432"),
+            "postgres:16-alpine",
+        ])
+        .status()
+        .expect("failed to start postgres container — is Docker running?");
+    assert!(status.success(), "docker run failed");
+}
+
+fn stop_container() {
+    let _ = Command::new("docker")
+        .args(["rm", "-f", CONTAINER_NAME])
+        .output();
+}
+
+fn wait_for_pg() {
+    for _ in 0..30 {
+        let output = Command::new("docker")
+            .args(["exec", CONTAINER_NAME, "pg_isready", "-U", PG_USER])
+            .output()
+            .expect("failed to run pg_isready");
+        if output.status.success() {
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(500));
+    }
+    panic!("PostgreSQL did not become ready within 15 seconds");
+}
+
+async fn new_store() -> PostgresStore {
+    let config = PostgresConfig {
+        url: Some(pg_url()),
+        max_connections: 5,
+        min_connections: 1,
+    };
+    let store = PostgresStore::new(&pg_url(), &config)
+        .await
+        .expect("failed to connect to PostgreSQL");
+    store.initialize().await.expect("initialize failed");
+    store.migrate().await.expect("migrate failed");
+    store
+}
+
+/// Single test function that runs all PostgreSQL assertions sequentially
+/// against one container to avoid port/container conflicts.
+#[tokio::test]
+async fn test_postgres_backend() {
+    start_container();
+    wait_for_pg();
+
+    // Wrap in a closure so we always stop the container, even on panic
+    let result = tokio::spawn(async {
+        let store = new_store().await;
+
+        // --- idempotent migrate ---
+        store
+            .migrate()
+            .await
+            .expect("second migrate should be idempotent");
+
+        // --- supernet CRUD ---
+        supernet_crud(&store).await;
+
+        // --- allocation lifecycle ---
+        allocation_lifecycle(&store).await;
+
+        // --- tags ---
+        tags(&store).await;
+
+        // --- audit log ---
+        audit_log(&store).await;
+
+        // --- operations layer (auto-allocate, utilization, free blocks) ---
+        operations_layer(store).await;
+    })
+    .await;
+
+    stop_container();
+    result.expect("test panicked inside spawned task");
+}
+
+async fn supernet_crud(store: &PostgresStore) {
+    let sn = store
+        .create_supernet(&CreateSupernet {
+            cidr: "10.0.0.0/8".to_string(),
+            name: Some("RFC1918 Class A".to_string()),
+            description: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(sn.cidr, "10.0.0.0/8");
+    assert_eq!(sn.network_address, "10.0.0.0");
+    assert_eq!(sn.broadcast_address, "10.255.255.255");
+    assert_eq!(sn.prefix_length, 8);
+    assert_eq!(sn.ip_version, 4);
+
+    let fetched = store.get_supernet(&sn.id).await.unwrap();
+    assert_eq!(fetched.cidr, "10.0.0.0/8");
+    assert_eq!(fetched.name, Some("RFC1918 Class A".to_string()));
+
+    let all = store.list_supernets().await.unwrap();
+    assert!(all.iter().any(|s| s.id == sn.id));
+
+    store.delete_supernet(&sn.id).await.unwrap();
+    let err = store.get_supernet(&sn.id).await;
+    assert!(err.is_err());
+}
+
+async fn allocation_lifecycle(store: &PostgresStore) {
+    let sn = store
+        .create_supernet(&CreateSupernet {
+            cidr: "172.16.0.0/12".to_string(),
+            name: Some("Private".to_string()),
+            description: None,
+        })
+        .await
+        .unwrap();
+
+    // Allocate with tags
+    let alloc = store
+        .create_allocation(&CreateAllocation {
+            supernet_id: sn.id.clone(),
+            cidr: "172.16.0.0/24".to_string(),
+            status: None,
+            resource_id: Some("vpc-abc".to_string()),
+            resource_type: Some("vpc".to_string()),
+            name: Some("web-tier".to_string()),
+            description: None,
+            environment: Some("production".to_string()),
+            owner: Some("platform".to_string()),
+            parent_allocation_id: None,
+            tags: Some(vec![Tag {
+                key: "team".to_string(),
+                value: "infra".to_string(),
+            }]),
+        })
+        .await
+        .unwrap();
+    assert_eq!(alloc.status, AllocationStatus::Active);
+    assert_eq!(alloc.tags.len(), 1);
+    assert_eq!(alloc.prefix_length, 24);
+
+    // Get
+    let fetched = store.get_allocation(&alloc.id).await.unwrap();
+    assert_eq!(fetched.resource_id, Some("vpc-abc".to_string()));
+    assert_eq!(fetched.tags.len(), 1);
+    assert_eq!(fetched.tags[0].key, "team");
+
+    // Update
+    let updated = store
+        .update_allocation(
+            &alloc.id,
+            &UpdateAllocation {
+                name: None,
+                description: Some("updated".to_string()),
+                resource_id: None,
+                resource_type: None,
+                environment: None,
+                owner: Some("new-team".to_string()),
+                status: None,
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(updated.description, Some("updated".to_string()));
+    assert_eq!(updated.owner, Some("new-team".to_string()));
+
+    // List with filter
+    let filtered = store
+        .list_allocations(&AllocationFilter {
+            supernet_id: Some(sn.id.clone()),
+            status: Some(AllocationStatus::Active),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(filtered.len(), 1);
+
+    // Release
+    let released = store.release_allocation(&alloc.id).await.unwrap();
+    assert_eq!(released.status, AllocationStatus::Released);
+    assert!(released.released_at.is_some());
+
+    // Find by status — should be empty (all released)
+    let active = store
+        .find_allocations_in_supernet(
+            &sn.id,
+            &[AllocationStatus::Active, AllocationStatus::Reserved],
+        )
+        .await
+        .unwrap();
+    assert!(active.is_empty());
+
+    // Delete supernet (allocations are released)
+    store.delete_supernet(&sn.id).await.unwrap();
+}
+
+async fn tags(store: &PostgresStore) {
+    let sn = store
+        .create_supernet(&CreateSupernet {
+            cidr: "192.168.0.0/16".to_string(),
+            name: None,
+            description: None,
+        })
+        .await
+        .unwrap();
+
+    let alloc = store
+        .create_allocation(&CreateAllocation {
+            supernet_id: sn.id.clone(),
+            cidr: "192.168.1.0/24".to_string(),
+            status: None,
+            resource_id: None,
+            resource_type: None,
+            name: None,
+            description: None,
+            environment: None,
+            owner: None,
+            parent_allocation_id: None,
+            tags: None,
+        })
+        .await
+        .unwrap();
+
+    // Set tags
+    store
+        .set_tags(
+            &alloc.id,
+            &[
+                Tag {
+                    key: "env".to_string(),
+                    value: "prod".to_string(),
+                },
+                Tag {
+                    key: "cost-center".to_string(),
+                    value: "eng".to_string(),
+                },
+            ],
+        )
+        .await
+        .unwrap();
+    let tags = store.get_tags(&alloc.id).await.unwrap();
+    assert_eq!(tags.len(), 2);
+
+    // Replace tags
+    store
+        .set_tags(
+            &alloc.id,
+            &[Tag {
+                key: "env".to_string(),
+                value: "staging".to_string(),
+            }],
+        )
+        .await
+        .unwrap();
+    let tags = store.get_tags(&alloc.id).await.unwrap();
+    assert_eq!(tags.len(), 1);
+    assert_eq!(tags[0].value, "staging");
+
+    // Cleanup
+    store.release_allocation(&alloc.id).await.unwrap();
+    store.delete_supernet(&sn.id).await.unwrap();
+}
+
+async fn audit_log(store: &PostgresStore) {
+    store
+        .append_audit(&AuditEntry {
+            id: String::new(),
+            entity_type: "supernet".to_string(),
+            entity_id: "sn-1".to_string(),
+            action: "create_supernet".to_string(),
+            details: Some(r#"{"cidr":"10.0.0.0/8"}"#.to_string()),
+            timestamp: "2026-03-06T00:00:00Z".to_string(),
+        })
+        .await
+        .unwrap();
+
+    store
+        .append_audit(&AuditEntry {
+            id: String::new(),
+            entity_type: "allocation".to_string(),
+            entity_id: "alloc-1".to_string(),
+            action: "allocate".to_string(),
+            details: None,
+            timestamp: "2026-03-06T00:01:00Z".to_string(),
+        })
+        .await
+        .unwrap();
+
+    // Query all
+    let entries = store.query_audit(&AuditFilter::default()).await.unwrap();
+    assert!(entries.len() >= 2);
+
+    // Query filtered by entity_id
+    let entries = store
+        .query_audit(&AuditFilter {
+            entity_id: Some("sn-1".to_string()),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].action, "create_supernet");
+
+    // Query with limit
+    let entries = store
+        .query_audit(&AuditFilter {
+            limit: Some(1),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(entries.len(), 1);
+}
+
+async fn operations_layer(store: PostgresStore) {
+    let ops = IpamOps::new(Arc::new(store));
+
+    let sn = ops
+        .create_supernet(&CreateSupernet {
+            cidr: "10.100.0.0/16".to_string(),
+            name: Some("ops-test".to_string()),
+            description: None,
+        })
+        .await
+        .unwrap();
+
+    // Auto-allocate 3 x /24
+    let allocs = ops
+        .allocate_auto(&AutoAllocateRequest {
+            supernet_id: sn.id.clone(),
+            prefix_length: 24,
+            count: Some(3),
+            status: None,
+            resource_id: None,
+            resource_type: None,
+            name: None,
+            description: None,
+            environment: None,
+            owner: None,
+            parent_allocation_id: None,
+            tags: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(allocs.len(), 3);
+    assert_eq!(allocs[0].cidr, "10.100.0.0/24");
+    assert_eq!(allocs[1].cidr, "10.100.1.0/24");
+    assert_eq!(allocs[2].cidr, "10.100.2.0/24");
+
+    // Utilization
+    let util = ops.utilization(&sn.id).await.unwrap();
+    assert_eq!(util.allocation_count, 3);
+    assert!(util.utilization_percent > 0.0);
+
+    // Free blocks
+    let free = ops.free_blocks(&sn.id, None).await.unwrap();
+    assert!(!free.blocks.is_empty());
+    assert!(free.total_free > 0);
+}

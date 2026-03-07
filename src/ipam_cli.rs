@@ -22,7 +22,7 @@ fn output_result<T: Serialize + TextOutput + CsvOutput>(
 
 async fn create_ops(db: Option<&str>) -> Result<IpamOps> {
     let config = IpamConfig::default();
-    let store = ipcalc::ipam::create_store(&config, db).await?;
+    let store = ipcalc::ipam::create_store(&config, db, None).await?;
     Ok(IpamOps::new(store))
 }
 

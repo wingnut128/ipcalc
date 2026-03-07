@@ -67,6 +67,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Responsive layout with sidebar collapsing to bottom bar on mobile
 - Shared input validation module (`src/validation.rs`) for CIDR, IP, text field, and identifier scrubbing
   - Centralized length checks, control character rejection, and path traversal detection
+- PostgreSQL IPAM storage backend (feature-gated behind `ipam-postgres`)
+  - `PostgresStore` implementing the `IpamStore` trait using `sqlx` with `PgPool`
+  - Embedded schema migrations matching the SQLite schema (uses `SMALLINT`, `BIGINT`, `BIGSERIAL`)
+  - Backend selection via `--ipam-backend postgres` CLI flag
+  - Connection URL via `--ipam-db-url`, `IPCALC_IPAM_DB_URL` env var, or `[ipam.postgres]` config
+  - Configurable connection pool (`max_connections`, `min_connections`)
+  - `Backend` enum and `PostgresConfig` in IPAM config module
+  - Docker-based PostgreSQL integration tests
   - Replaces inline `MAX_INPUT_LENGTH` in `ipv4.rs` and `ipv6.rs`
   - Wired into all IPAM `IpamOps` public methods
 

@@ -1,12 +1,42 @@
 use serde::Deserialize;
 use std::path::PathBuf;
 
+#[derive(Debug, Clone, Default, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum Backend {
+    #[default]
+    Sqlite,
+    Postgres,
+}
+
+impl std::fmt::Display for Backend {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Sqlite => write!(f, "sqlite"),
+            Self::Postgres => write!(f, "postgres"),
+        }
+    }
+}
+
+impl std::str::FromStr for Backend {
+    type Err = String;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "sqlite" => Ok(Self::Sqlite),
+            "postgres" | "postgresql" => Ok(Self::Postgres),
+            other => Err(format!("unknown IPAM backend: {other}")),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default)]
 pub struct IpamConfig {
     pub enabled: bool,
     pub auto_init: bool,
+    pub backend: Backend,
     pub sqlite: SqliteConfig,
+    pub postgres: PostgresConfig,
 }
 
 impl Default for IpamConfig {
@@ -14,7 +44,9 @@ impl Default for IpamConfig {
         Self {
             enabled: true,
             auto_init: true,
+            backend: Backend::default(),
             sqlite: SqliteConfig::default(),
+            postgres: PostgresConfig::default(),
         }
     }
 }
@@ -33,6 +65,49 @@ impl Default for SqliteConfig {
             wal_mode: true,
         }
     }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct PostgresConfig {
+    pub url: Option<String>,
+    pub max_connections: u32,
+    pub min_connections: u32,
+}
+
+impl Default for PostgresConfig {
+    fn default() -> Self {
+        Self {
+            url: None,
+            max_connections: 10,
+            min_connections: 2,
+        }
+    }
+}
+
+/// Resolve the PostgreSQL connection URL using the following precedence:
+/// 1. CLI `--ipam-db-url <url>` flag (passed as `cli_url`)
+/// 2. `IPCALC_IPAM_DB_URL` environment variable
+/// 3. `url` in config file (via `PostgresConfig`)
+pub fn resolve_postgres_url(cli_url: Option<&str>, config: &PostgresConfig) -> Option<String> {
+    let env_val = std::env::var("IPCALC_IPAM_DB_URL").ok();
+    resolve_postgres_url_inner(cli_url, env_val.as_deref(), config)
+}
+
+fn resolve_postgres_url_inner(
+    cli_url: Option<&str>,
+    env_url: Option<&str>,
+    config: &PostgresConfig,
+) -> Option<String> {
+    if let Some(url) = cli_url {
+        return Some(url.to_string());
+    }
+    if let Some(url) = env_url
+        && !url.is_empty()
+    {
+        return Some(url.to_string());
+    }
+    config.url.clone()
 }
 
 /// Resolve the SQLite database path using the following precedence:
@@ -124,5 +199,51 @@ mod tests {
         let config = SqliteConfig::default();
         let path = resolve_db_path_inner(None, None, &config);
         assert!(path.ends_with("ipcalc/ipcalc.db"));
+    }
+
+    #[test]
+    fn test_backend_from_str() {
+        assert_eq!("sqlite".parse::<Backend>().unwrap(), Backend::Sqlite);
+        assert_eq!("postgres".parse::<Backend>().unwrap(), Backend::Postgres);
+        assert_eq!("postgresql".parse::<Backend>().unwrap(), Backend::Postgres);
+        assert!("unknown".parse::<Backend>().is_err());
+    }
+
+    #[test]
+    fn test_postgres_url_cli_precedence() {
+        let config = PostgresConfig {
+            url: Some("postgresql://config".to_string()),
+            ..Default::default()
+        };
+        let url =
+            resolve_postgres_url_inner(Some("postgresql://cli"), Some("postgresql://env"), &config);
+        assert_eq!(url, Some("postgresql://cli".to_string()));
+    }
+
+    #[test]
+    fn test_postgres_url_env_precedence() {
+        let config = PostgresConfig {
+            url: Some("postgresql://config".to_string()),
+            ..Default::default()
+        };
+        let url = resolve_postgres_url_inner(None, Some("postgresql://env"), &config);
+        assert_eq!(url, Some("postgresql://env".to_string()));
+    }
+
+    #[test]
+    fn test_postgres_url_config_fallback() {
+        let config = PostgresConfig {
+            url: Some("postgresql://config".to_string()),
+            ..Default::default()
+        };
+        let url = resolve_postgres_url_inner(None, None, &config);
+        assert_eq!(url, Some("postgresql://config".to_string()));
+    }
+
+    #[test]
+    fn test_postgres_url_none_when_missing() {
+        let config = PostgresConfig::default();
+        let url = resolve_postgres_url_inner(None, None, &config);
+        assert!(url.is_none());
     }
 }

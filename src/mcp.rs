@@ -473,7 +473,7 @@ impl ServerHandler for IpCalcMcp {
 pub async fn run_mcp_server(ipam_db: Option<&str>) -> crate::error::Result<()> {
     let ipam_ops = if let Some(db) = ipam_db {
         let config = crate::ipam::config::IpamConfig::default();
-        let store = crate::ipam::create_store(&config, Some(db)).await?;
+        let store = crate::ipam::create_store(&config, Some(db), None).await?;
         Some(Arc::new(IpamOps::new(store)))
     } else {
         None
