@@ -2,7 +2,7 @@
 //!
 //! Provides CLI, TUI, and HTTP API interfaces for subnet calculations,
 //! including prefix lookups, subnet splitting, address containment checks,
-//! range-to-CIDR conversion, and route summarization.
+//! range-to-CIDR conversion, route summarization, and IPAM.
 
 // Core calculation modules
 pub mod batch;
