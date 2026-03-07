@@ -34,7 +34,7 @@ schemars = { version = "1", optional = true }
 ratatui = { version = "0.30", optional = true }
 crossterm = { version = "0.27", optional = true }
 ipnet = { version = "2", optional = true }
-sqlx = { version = "0.8", features = ["runtime-tokio", "postgres"], optional = true }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "postgres"], optional = true }
 
 # OpenAPI/Swagger dependencies
 utoipa = { version = "5", features = ["axum_extras"], optional = true }

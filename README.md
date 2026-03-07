@@ -556,7 +556,7 @@ The IPAM module provides library-level IP address allocation tracking with a plu
 
 - **SQLite** (default) — zero-config, WAL mode, r2d2 connection pooling, embedded schema migrations
 - **PostgreSQL** — opt-in via `--features ipam-postgres`, uses `sqlx` with async connection pooling; configure with `--ipam-backend postgres --ipam-db-url <url>`
-- **Pluggable design** — the `IpamStore` async trait allows additional backends (MySQL) in future releases
+- **Pluggable design** — the `IpamStore` async trait allows additional backends via feature flags
 
 **CLI usage:**
 
