@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-03-07
+
 ### Added
 
 - IPAM persistence layer with SQLite backend for tracking IP address allocations
@@ -431,7 +433,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dockerfile for containerized deployment
 - Makefile for common development tasks
 
-[Unreleased]: https://github.com/wingnut128/ipcalc/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/wingnut128/ipcalc/compare/v0.13.1...HEAD
+[0.13.1]: https://github.com/wingnut128/ipcalc/compare/v0.12.0...v0.13.1
 [0.12.0]: https://github.com/wingnut128/ipcalc/compare/v0.11.1...v0.12.0
 [0.11.1]: https://github.com/wingnut128/ipcalc/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/wingnut128/ipcalc/compare/v0.10.0...v0.11.0
