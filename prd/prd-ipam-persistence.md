@@ -400,9 +400,9 @@ New tools exposed through the MCP server, following the existing pattern of wrap
 
 ### Phase 4: MCP Integration
 
-- Add new tool registrations in `mcp-server/src/tools.ts`
-- Each tool maps to `ipcalc ipam ...` CLI invocation (existing pattern)
-- Zod schemas for input validation
+- Add new tool registrations in `src/mcp.rs` (Rust-native MCP server)
+- Each tool calls library functions directly (no subprocess overhead)
+- Type-safe input validation via `schemars` and `rmcp` derive macros
 - Integration tests
 
 ### Phase 5: Free Space & Utilization Engine
