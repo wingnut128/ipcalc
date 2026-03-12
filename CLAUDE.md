@@ -61,6 +61,7 @@ After every commit (whether from a Linear ticket or not):
 
 - **CHANGELOG.md**: Always add an entry under `[Unreleased]` for any meaningful change (features, fixes, refactors, CI changes, dependency updates). Only skip for typo fixes or whitespace-only changes.
 - **README.md**: Update whenever there are important changes to the codebase — new or changed CLI commands, new build/make targets, new features, deprecation warnings, removed functionality, or changes to setup/install instructions. Do not update README for purely internal refactors or CI-only changes unless they affect the developer workflow (e.g., new `make` targets).
+- **SECURITY.md**: Update the supported versions table whenever a new version is released. Only the two most recent minor versions are supported (e.g., 0.13.x and 0.12.x). All older versions should be marked as unsupported.
 
 ### Task completion checklist
 
