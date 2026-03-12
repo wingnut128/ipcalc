@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - Legacy Node.js MCP server (`mcp-server/`) — fully superseded by Rust-native implementation in `src/mcp.rs`
+
+### Changed
+
+- Reorganized planning and PRD documents into `.context/` directory
+- Removed obsolete `TODO-ipam.md` and `prd/` directory
+- Updated SECURITY.md supported versions table
+- Added SECURITY.md update rule to CLAUDE.md post-commit documentation guidelines
 ## [0.13.1] - 2026-03-07
 
 ### Added
