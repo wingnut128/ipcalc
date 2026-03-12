@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- Legacy Node.js MCP server (`mcp-server/`) — fully superseded by Rust-native implementation in `src/mcp.rs`
 ## [0.13.1] - 2026-03-07
 
 ### Added
